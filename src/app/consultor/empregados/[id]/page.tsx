@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BotaoAcao, Formulario } from "@/components/Formulario";
+import { ChecklistsContrato } from "@/components/ChecklistsContrato";
 import { AreaTexto, Aviso, Campo, Cartao, Celula, Grade, LinkBotao, Selecao, Selo, Tabela, Titulo } from "@/components/ui";
 import {
   addMeses, DIAS_SEMANA, diasAvisoPrevio, formatarCpf, formatarData, formatarMoeda, hojeBrasil, idade, NOMES_DIAS_SEMANA, NOMES_REGIME, NOMES_RESCISAO, salarioMinimoProporcional, type RegraFeriasParcial,
@@ -194,6 +195,8 @@ export default async function DetalheEmpregado({ params }: { params: Promise<{ i
               </Formulario>
             </Cartao>
           )}
+
+          <ChecklistsContrato />
 
           <Cartao titulo="Benefícios">
             <ul className="space-y-1 text-sm">

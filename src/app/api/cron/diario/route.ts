@@ -8,7 +8,8 @@ import { agendaDoBanco } from "@/lib/servicos/agenda";
  * Rotina diária (Vercel Cron, ver vercel.json):
  * - marca procurações vencidas;
  * - gera as mensalidades do mês no dia 1º;
- * - envia por e-mail os lembretes dos próximos 7 dias ao consultor e a cada cliente.
+ * - envia por e-mail os lembretes dos próximos 7 dias ao consultor e a cada cliente;
+ * - lembra o cliente da mensalidade que vai vencer.
  */
 export async function GET(req: NextRequest) {
   const segredo = process.env.CRON_SECRET;
@@ -49,6 +50,19 @@ export async function GET(req: NextRequest) {
       if (u && (await enviarEmail(u.email, "Lembrete: prazos do seu empregado doméstico", `<p>Olá, ${u.nome.split(" ")[0]}!</p>${lista(urgentes)}<p><a href="${app}/cliente">Abrir o portal</a></p>`))) enviados++;
     }
   }
+  // Lembrete automático de mensalidade (3 dias antes e no dia do vencimento), uma vez por mensalidade e etapa
+  const abertas = await prisma.mensalidade.findMany({ where: { status: "ABERTO", vencimento: { gte: hoje, lte: addDias(hoje, 3) } }, include: { cliente: { include: { usuarios: { where: { papel: "CLIENTE", ativo: true } } } } } });
+  let lembretes = 0;
+  for (const m of abertas) {
+    if (m.lembreteEnviadoEm && diferencaDias(m.lembreteEnviadoEm, hoje) < 3) continue;
+    const u = m.cliente.usuarios[0];
+    if (!u) continue;
+    if (await enviarEmail(u.email, "Lembrete: mensalidade da consultoria", `<p>Olá, ${u.nome.split(" ")[0]}!</p><p>A mensalidade de ${String(m.mes).padStart(2, "0")}/${m.ano}, no valor de R$ ${Number(m.valor).toFixed(2).replace(".", ",")}, vence em ${formatarData(m.vencimento)}.</p><p><a href="${app}/cliente/mensalidade">Pagar com Pix</a></p>`)) {
+      await prisma.mensalidade.update({ where: { id: m.id }, data: { lembreteEnviadoEm: new Date() } });
+      lembretes++;
+    }
+  }
+  relatorio.lembretesMensalidade = lembretes;
   relatorio.emailsEnviados = enviados;
   relatorio.eventosSemana = eventos.length;
   return NextResponse.json({ ok: true, data: formatarData(hoje), ...relatorio });

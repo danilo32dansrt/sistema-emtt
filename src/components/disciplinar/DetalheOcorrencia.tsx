@@ -61,10 +61,11 @@ export async function DetalheOcorrencia({ usuario, id }: { usuario: UsuarioLogad
             )}
           </Cartao>
 
-          <Cartao titulo="4–5. Recomendação e checagens de segurança">
+          <Cartao titulo={aberta ? "4–5. Recomendação e checagens de segurança" : "4–5. Recomendação"}>
             <p className="text-lg font-bold text-marca-700">{NOMES_MEDIDA[rec.medida]}{rec.medida === "SUSPENSAO" ? ` de ${rec.diasSuspensao} dia(s)` : ""}</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{rec.explicacao.map((x) => <li key={x}>{x}</li>)}</ul>
-            <div className="mt-3 space-y-2">
+            {!aberta && <p className="mt-3 text-sm text-slate-600">Recomendação no momento do registro. {oc.aplicadaEm ? `Medida aplicada em ${formatarData(oc.aplicadaEm)}.` : ""}</p>}
+            <div className={aberta ? "mt-3 space-y-2" : "hidden"}>
               {rec.checagens.map((c) => <Aviso key={c.mensagem} tipo={c.tipo === "bloqueio" || c.tipo === "critico" ? "critico" : c.tipo === "aviso" ? "aviso" : "sucesso"}>{c.tipo === "bloqueio" && <strong>Impedimento: </strong>}{c.mensagem}</Aviso>)}
             </div>
           </Cartao>

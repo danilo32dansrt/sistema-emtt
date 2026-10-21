@@ -21,7 +21,7 @@ com três acessos: **Consultor (administrador)**, **Cliente (empregador domésti
 - Explique em linguagem simples (o dono do projeto não é programador).
 - Nunca coloque senhas ou chaves no código; use o arquivo `.env` (modelo em `.env.example`).
 - Faça commit no Git ao fim de cada etapa concluída.
-- Tabelas de salário mínimo, INSS e salário-família ficam no banco, editáveis por ano (tela "Tabelas anuais").
+- Todos os valores legais ficam na tabela única de parâmetros (tela "Parâmetros legais"), com data de vigência — nunca fixos no código.
 - Quando tiver dúvida sobre uma regra da legislação, pergunte em vez de supor.
 
 ## Comandos
@@ -33,7 +33,8 @@ com três acessos: **Consultor (administrador)**, **Cliente (empregador domésti
 ## Organização do código
 - `src/lib/calculos/` — **núcleo de cálculos puro** (sem banco), com testes em `__tests__/`:
   dinheiro, datas/feriados, INSS, encargos do DAE, folha, 13º, férias, rescisão, regularização,
-  validações, agenda de alertas, checklist, ponto (jornada), simuladores, diagnóstico, disciplinar.
+  validações, agenda de alertas, checklist, ponto (jornada), simuladores, diagnóstico, disciplinar,
+  parâmetros com vigência (`parametros.ts`, valores iniciais em `parametros-padrao.ts`) e benefícios sociais.
 - `src/lib/servicos/` — junta banco + cálculos (agenda, espelho de ponto, documentos, diagnóstico, disciplinar).
 - `src/lib/pdf/` — modelos de documentos em PDF.
 - `src/app/consultor`, `src/app/cliente`, `src/app/ponto` — telas de cada perfil; `src/app/api` — rotas.
@@ -145,3 +146,45 @@ Páginas curtas: como conversar com a empregada, como escrever uma advertência,
 
 ### Aviso no sistema
 "As recomendações são orientativas e não substituem análise de advogado em casos graves."
+
+---
+
+## Simulador de benefícios para a empregada (carteira assinada x informal)
+
+Objetivo: mostrar à trabalhadora, com números da família dela, o que acontece com os benefícios sociais se ela tiver a
+carteira assinada ou não, e quais direitos e deveres ela passa a ter. Muitas recusam o registro por medo de perder o
+Bolsa Família; o simulador deve esclarecer, nunca ensinar a esconder renda.
+
+Entradas: quantas pessoas moram na casa (composição do CadÚnico); renda de cada pessoa (trabalho, pensão, outros
+benefícios); salário proposto na carteira; benefícios atuais: Bolsa Família (valor e composição), BPC, outros.
+
+Saídas (lado a lado: sem carteira x com carteira): renda per capita antes e depois; situação do Bolsa Família (mantém
+integral, entra na regra de proteção — metade do benefício por até 2 anos se a renda per capita ficar até meio salário
+mínimo — ou sai do programa); alerta específico para BPC (renda do trabalho pode afetar o benefício; recomendar orientação
+no CRAS/INSS); direitos com o registro (FGTS, seguro-desemprego, aposentadoria, auxílio-doença, licença-maternidade,
+férias + 1/3, 13º, proteção em acidente); deveres (desconto do INSS, jornada e registro de ponto, comunicar falta,
+atualizar o CadÚnico); ganho financeiro total estimado em 12 meses e em 5 anos.
+
+Regras: linguagem simples, pensada para mostrar no celular à empregada; sempre exibir o aviso
+"Simulação estimada. Confirme no CRAS ou no app Bolsa Família."; gerar PDF/imagem para enviar por WhatsApp;
+nunca sugerir omitir renda ou deixar de atualizar o CadÚnico.
+
+Implementação: `src/lib/calculos/beneficios-sociais.ts` (regras e testes), `src/components/calc/SimuladorBeneficios.tsx`,
+páginas `/cliente/simuladores/beneficios` e `/consultor/simuladores/beneficios`. No cenário "sem carteira" usa-se a renda
+atual dela (que também deve constar no CadÚnico); no "com carteira", o salário bruto proposto.
+
+## Tabela de parâmetros legais e atualização
+
+Todos os valores legais ficam numa tabela única de parâmetros (`Parametro`), com data de vigência, nunca fixos no código:
+salário mínimo, faixas e alíquotas do INSS, alíquotas patronais e FGTS, limites e valores do Bolsa Família (linha de
+pobreza, regra de proteção, benefícios por pessoa), critério do BPC, teto do salário-família, multa e juros do DAE.
+- Tela de administração (`/consultor/parametros`) para editar os valores, com histórico: cálculos de meses passados usam
+  o valor vigente na época (`tabelaNaData`).
+- Campo de fonte oficial (link) e data da última conferência em cada parâmetro.
+- Alerta automático todo dia 2 de janeiro e sempre que um parâmetro passar 6 meses sem conferência (painel, menu e e-mail).
+- Opcional (implementado): às segundas-feiras a rotina diária verifica as páginas oficiais (gov.br) e avisa se mudaram;
+  a atualização é sempre confirmada pelo consultor.
+- Ao alterar um parâmetro, os cálculos e simulações passam a usar o novo valor automaticamente; o sistema lista os
+  clientes afetados (ex.: salário abaixo do novo mínimo, DAE diferente) e permite avisá-los pelo chat.
+
+Antes de usar com clientes, confira os valores atuais do Bolsa Família e do BPC no gov.br.

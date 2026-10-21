@@ -26,6 +26,8 @@ Tem três acessos, cada um vendo **apenas os próprios dados**:
 - **Aplicativo de ponto** (instalável, funciona offline): selfie e localização só na hora da marcação, marcações que não podem ser alteradas (o banco bloqueia), comprovante com código de autenticidade, ajustes e justificativas aprovados pelo empregador, espelho mensal com valores em reais por rubrica, arquivos AFD/AEJ.
 - **Portal do cliente**, **simuladores** (custo de contratar, diarista × mensalista, reajuste, hora extra/noturno, rescisão, férias, 13º, regularização), painel de custos, provisão mensal.
 - **Gestão disciplinar** guiada: registro dos fatos, versão da empregada, recomendação automática pela gradação, checagens de segurança, 8 modelos de documento, recusa de assinatura com testemunhas, desconto da suspensão na folha e **trava da justa causa** (só o consultor libera).
+- **Simulador de benefícios** para mostrar à empregada (carteira assinada × informal): renda por pessoa, situação do Bolsa Família (integral, regra de proteção ou saída), alerta de BPC, direitos e deveres, ganho em 12 meses e 5 anos, PDF e WhatsApp.
+- **Parâmetros legais** com data de vigência, histórico, fonte oficial e data de conferência (salário mínimo, INSS, encargos, salário-família, multa/juros do DAE, Bolsa Família, BPC), com alertas e aviso aos clientes afetados.
 - **Diagnóstico de riscos** com nota de 0 a 100 por cliente.
 - **Financeiro** (mensalidades, avulsos, inadimplência, Pix copia e cola com QR Code), **captação** (funil e proposta em PDF), chat, base de conhecimento, produtividade, registro de atividades.
 - **LGPD**: senhas criptografadas, CPF mascarado, registro de acessos, exportação em planilha, backup e exclusão a pedido.
@@ -59,7 +61,7 @@ Os dados de exemplo trazem um empregado de cada regime: **Maria** (parcial 22h, 
 ```bash
 npm test
 ```
-São 85 testes. O principal confere o caso real de fevereiro/2026: proporcional **R$ 578,93**, INSS **R$ 43,41**, líquido **R$ 535,52** e DAE **R$ 159,18**; e o mês cheio: INSS **R$ 60,78** e líquido **R$ 749,72**.
+São 95 testes. O principal confere o caso real de fevereiro/2026: proporcional **R$ 578,93**, INSS **R$ 43,41**, líquido **R$ 535,52** e DAE **R$ 159,18**; e o mês cheio: INSS **R$ 60,78** e líquido **R$ 749,72**.
 
 > ⚠️ **Ponto em aberto:** no mês cheio o eSocial gerou DAE de **R$ 222,89** e o sistema calcula **R$ 222,87**. Nenhuma regra única de arredondamento reproduz os dois DAEs ao mesmo tempo. Para acertar, precisamos da guia do mês cheio com as parcelas separadas (INSS, GILRAT, FGTS e FGTS compensatório).
 
@@ -84,7 +86,7 @@ São 85 testes. O principal confere o caso real de fevereiro/2026: proporcional 
 ## Antes de vender o sistema
 
 - Peça a um **contador ou advogado trabalhista** para revisar as regras e os cálculos (principalmente rescisão, férias do tempo parcial e o módulo disciplinar).
-- Confira todo mês de janeiro as **tabelas anuais** (salário mínimo, INSS e salário-família) na tela *Tabelas anuais*. Os valores de 2026 que vêm na carga inicial devem ser conferidos com as portarias oficiais.
+- Confira os **parâmetros legais** (tela *Parâmetros legais*): todos chegam sem data de conferência e o sistema pede para conferir cada um na fonte oficial. Confira principalmente os valores de 2026 e os do **Bolsa Família e BPC** no gov.br antes de usar o simulador com clientes.
 - Para vender o aplicativo de ponto como **REP-P**: é preciso registro do programa no **INPI**, atestado técnico e termo de responsabilidade, além de seguir a **Portaria MTP 671/2021** (os arquivos AFD/AEJ gerados devem ser validados com o leiaute oficial).
 - **Férias no tempo parcial**: há divergência entre a LC 150 (tabela de 8 a 18 dias) e a CLT após a Reforma (30 dias). O sistema usa 30 dias por padrão (mais seguro) e permite trocar em *Configurações*.
 

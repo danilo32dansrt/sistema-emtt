@@ -1,0 +1,15 @@
+{
+  "name": "Ponto Doméstico",
+  "short_name": "Ponto",
+  "description": "Registro de ponto do empregado doméstico (LC 150/2015)",
+  "lang": "pt-BR",
+  "start_url": "/ponto",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#1f58bd",
+  "icons": [
+    { "src": "/icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icone-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

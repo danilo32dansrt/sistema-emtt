@@ -3,6 +3,7 @@ import { addDias, diasNoMes, data, diferencaDias, formatarData, hojeBrasil } fro
 import { prisma } from "@/lib/db";
 import { enviarEmail } from "@/lib/email";
 import { agendaDoBanco } from "@/lib/servicos/agenda";
+import { rotinaCobrancaInter } from "@/lib/servicos/cobranca-inter";
 import { situacaoParametros, verificarFontesOficiais } from "@/lib/servicos/parametros";
 
 /**
@@ -10,6 +11,7 @@ import { situacaoParametros, verificarFontesOficiais } from "@/lib/servicos/para
  * - marca procurações vencidas;
  * - gera as mensalidades do mês no dia 1º;
  * - envia por e-mail os lembretes dos próximos 7 dias ao consultor e a cada cliente;
+ * - emite pelo Banco Inter as cobranças das mensalidades e confere as pendentes (baixa automática);
  * - lembra o cliente da mensalidade que vai vencer;
  * - verifica as páginas oficiais dos parâmetros e avisa o consultor quando há algo a conferir.
  */
@@ -33,6 +35,18 @@ export async function GET(req: NextRequest) {
       }
     }
     relatorio.mensalidadesGeradas = n;
+  }
+
+  // Cobrança automática pelo Inter (só se ligada nas configurações e com credenciais no .env)
+  try {
+    const inter = await rotinaCobrancaInter(hoje);
+    relatorio.cobrancasInterEmitidas = inter.emitidas;
+    relatorio.cobrancasInterConferidas = inter.conferidas;
+    relatorio.mensalidadesPagasInter = inter.pagas;
+    relatorio.errosInter = inter.erros;
+  } catch (e) {
+    console.error("Rotina de cobrança Inter falhou", e);
+    relatorio.errosInter = -1;
   }
 
   const eventos = (await agendaDoBanco({ de: hoje, ate: addDias(hoje, 7), hoje })).filter((e) => e.tipo !== "ANIVERSARIO_ADMISSAO");
@@ -59,7 +73,7 @@ export async function GET(req: NextRequest) {
     if (m.lembreteEnviadoEm && diferencaDias(m.lembreteEnviadoEm, hoje) < 3) continue;
     const u = m.cliente.usuarios[0];
     if (!u) continue;
-    if (await enviarEmail(u.email, "Lembrete: mensalidade da consultoria", `<p>Olá, ${u.nome.split(" ")[0]}!</p><p>A mensalidade de ${String(m.mes).padStart(2, "0")}/${m.ano}, no valor de R$ ${Number(m.valor).toFixed(2).replace(".", ",")}, vence em ${formatarData(m.vencimento)}.</p><p><a href="${app}/cliente/mensalidade">Pagar com Pix</a></p>`)) {
+    if (await enviarEmail(u.email, "Lembrete: mensalidade da consultoria", `<p>Olá, ${u.nome.split(" ")[0]}!</p><p>A mensalidade de ${String(m.mes).padStart(2, "0")}/${m.ano}, no valor de R$ ${Number(m.valor).toFixed(2).replace(".", ",")}, vence em ${formatarData(m.vencimento)}.</p><p><a href="${app}/cliente/mensalidade">Pagar com Pix ou boleto</a></p>`)) {
       await prisma.mensalidade.update({ where: { id: m.id }, data: { lembreteEnviadoEm: new Date() } });
       lembretes++;
     }

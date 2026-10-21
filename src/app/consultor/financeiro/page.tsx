@@ -5,7 +5,9 @@ import { num } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
 import { configuracao, modelosMensagem } from "@/lib/tabelas-db";
 import { linkWhatsapp, preencherModelo } from "@/lib/whatsapp";
-import { baixarMensalidade, baixarServico, gerarMensalidades, reabrirMensalidade, salvarServico } from "./acoes";
+import { configInter } from "@/lib/inter/api";
+import { cobrancaAtiva, ROTULOS_SITUACAO_INTER } from "@/lib/inter/regras";
+import { atualizarCobrancaInter, baixarMensalidade, baixarServico, cancelarCobrancaInter, emitirCobrancaInter, gerarMensalidades, reabrirMensalidade, salvarServico, simularPagamentoInter } from "./acoes";
 
 export const metadata = { title: "Financeiro" };
 
@@ -27,6 +29,9 @@ export default async function Financeiro({ searchParams }: { searchParams: Promi
   const recebido = somar(...mensalidades.filter((m) => m.status === "PAGO").map((m) => num(m.valor)), ...servicos.filter((s) => s.status === "PAGO").map((s) => num(s.valor)));
   const inadimplencia = somar(...atrasadas.map((m) => num(m.valor)));
   const mesAtualIso = `${ano}-${String(mes).padStart(2, "0")}`;
+  const inter = configInter();
+  const usaInter = cfg.cobrancaInter && inter.configurado;
+  const corSituacao = (s: string | null) => (s === "RECEBIDO" || s === "MARCADO_RECEBIDO" ? "verde" : s === "ATRASADO" || s === "FALHA_EMISSAO" ? "vermelho" : s === "A_RECEBER" || s === "EM_PROCESSAMENTO" ? "azul" : "cinza");
 
   return (
     <>
@@ -45,7 +50,8 @@ export default async function Financeiro({ searchParams }: { searchParams: Promi
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Cartao titulo={`Mensalidades ${formatarCompetencia(ano, mes)}`} acoes={<Formulario acao={gerarMensalidades} textoBotao="Gerar mensalidades do mês" variante="secundario" pequeno><input type="hidden" name="competencia" value={mesAtualIso} /></Formulario>}>
-            <Tabela cabecalho={["Cliente", "Valor", "Vencimento", "Situação", ""]} vazio="Nenhuma mensalidade gerada para este mês.">
+            {usaInter ? <p className="mb-3 text-sm text-slate-600">Cobrança automática pelo Banco Inter ligada{inter.ambiente === "sandbox" ? " (ambiente de TESTES — nenhum dinheiro de verdade)" : ""}: a baixa é feita sozinha quando o cliente paga.</p> : <p className="mb-3 text-sm text-slate-600">Cobrança automática pelo Inter desligada. <a className="font-semibold text-marca-700 underline" href="/consultor/configuracoes#inter">Configurar</a></p>}
+            <Tabela cabecalho={["Cliente", "Valor", "Vencimento", "Situação", ...(usaInter ? ["Banco Inter"] : []), ""]} vazio="Nenhuma mensalidade gerada para este mês.">
               {mensalidades.map((m) => {
                 const msg = preencherModelo(modelo.texto, { nome: m.cliente.nome.split(" ")[0], "mês": `${nomeMes(m.mes)}/${m.ano}`, mes: `${nomeMes(m.mes)}/${m.ano}`, valor: formatarMoeda(num(m.valor)), data: formatarData(m.vencimento), pix: cfg.chavePix ?? "" });
                 return (
@@ -53,11 +59,26 @@ export default async function Financeiro({ searchParams }: { searchParams: Promi
                     <Celula>{m.cliente.nome}</Celula>
                     <Celula className="tabular-nums">{formatarMoeda(num(m.valor))}</Celula>
                     <Celula>{formatarData(m.vencimento)}</Celula>
-                    <Celula>{m.status === "PAGO" ? <Selo cor="verde">pago {m.pagoEm ? formatarData(m.pagoEm) : ""}</Selo> : m.vencimento < hoje ? <Selo cor="vermelho">atrasado</Selo> : <Selo cor="amarelo">aberto</Selo>}</Celula>
+                    <Celula>{m.status === "PAGO" ? <Selo cor="verde">pago {m.pagoEm ? formatarData(m.pagoEm) : ""}</Selo> : m.vencimento < hoje ? <Selo cor="vermelho">atrasado</Selo> : <Selo cor="amarelo">aberto</Selo>}{m.formaPagamento && m.status === "PAGO" && <span className="block text-xs text-slate-500">{m.formaPagamento}</span>}</Celula>
+                    {usaInter && (
+                      <Celula>
+                        {m.interCodigo && <Selo cor={corSituacao(m.interSituacao)}>{ROTULOS_SITUACAO_INTER[m.interSituacao ?? ""] ?? "—"}</Selo>}
+                        {m.interErro && <span className="block max-w-56 text-xs text-red-700">{m.interErro}</span>}
+                        {m.status === "ABERTO" && (
+                          <span className="mt-1 flex flex-wrap gap-1">
+                            {!cobrancaAtiva(m.interSituacao) && <BotaoAcao acao={emitirCobrancaInter} campos={{ id: m.id }}>{m.interCodigo ? "Emitir de novo" : "Emitir cobrança"}</BotaoAcao>}
+                            {m.interCodigo && <BotaoAcao acao={atualizarCobrancaInter} campos={{ id: m.id }}>Atualizar</BotaoAcao>}
+                            {cobrancaAtiva(m.interSituacao) && <a className="inline-flex min-h-9 items-center rounded-xl border border-slate-300 px-3 text-sm font-semibold" href={`/api/inter/boleto/${m.id}`} target="_blank" rel="noreferrer">Boleto</a>}
+                            {cobrancaAtiva(m.interSituacao) && <BotaoAcao acao={cancelarCobrancaInter} campos={{ id: m.id }} confirmar="Cancelar esta cobrança no banco? O cliente não conseguirá mais pagá-la.">Cancelar</BotaoAcao>}
+                            {inter.ambiente === "sandbox" && cobrancaAtiva(m.interSituacao) && <BotaoAcao acao={simularPagamentoInter} campos={{ id: m.id, forma: "PIX" }} variante="sucesso">Simular Pix (teste)</BotaoAcao>}
+                          </span>
+                        )}
+                      </Celula>
+                    )}
                     <Celula className="whitespace-nowrap">
                       {m.status === "PAGO" ? <BotaoAcao acao={reabrirMensalidade} campos={{ id: m.id }}>Reabrir</BotaoAcao> : (
                         <span className="flex gap-1">
-                          <BotaoAcao acao={baixarMensalidade} campos={{ id: m.id, forma: "Pix" }} variante="sucesso">Pago</BotaoAcao>
+                          <BotaoAcao acao={baixarMensalidade} campos={{ id: m.id, forma: usaInter ? "Outro meio" : "Pix" }} variante="sucesso" confirmar={usaInter && cobrancaAtiva(m.interSituacao) ? "Dar baixa manual? A cobrança no Inter será cancelada." : undefined}>Pago</BotaoAcao>
                           {m.cliente.telefone && <a className="inline-flex min-h-9 items-center rounded-xl bg-[#25D366] px-3 text-sm font-semibold text-white" target="_blank" rel="noreferrer" href={linkWhatsapp(m.cliente.telefone, msg)}>Cobrar</a>}
                         </span>
                       )}

@@ -66,6 +66,10 @@ Empregada em tempo parcial de 22h semanais, salário R$ 810,50, admitida em 09/0
 - **2.5 Agenda e alertas automáticos:** DAE (dia 7); 13º (30/11 e 20/12); férias (60 dias antes do fim do aquisitivo e alerta forte 60 dias antes do fim do concessivo); aviso de férias 30 dias antes e pagamento 2 dias antes; fim da experiência; vencimento da procuração; aniversário de admissão (+3 dias de aviso).
 - **2.6 Documentos (PDF):** contrato de trabalho (integral, parcial, experiência); folha de ponto; aviso e recibo de férias; aviso prévio (empregador/empregado); recibo de 13º e de adiantamento; contrato de prestação de serviços consultor–cliente (cliente envia informações até dia 30 e paga o DAE no prazo; consultor emite guias até dia 4).
 - **2.7 Financeiro:** mensalidades (valor, vencimento, pago/aberto, forma), serviços avulsos, relatório mensal de faturamento e inadimplência, tabela de preços.
+- **2.7.1 Cobrança automática (Banco Inter PJ):** API Cobrança v3 (boleto com Pix) com certificado (mTLS) — `src/lib/inter/`
+  (regras puras + testes; cliente HTTP), `src/lib/servicos/cobranca-inter.ts`, webhook `/api/inter/webhook?token=…` (só dispara
+  a consulta ao banco; nunca confiar no corpo do aviso) e conferência diária no cron. Credenciais `INTER_*` só no `.env`.
+  Cartão de crédito não existe na API do Inter: baixa manual.
 - **2.8 Comunicação:** botão de WhatsApp com mensagem pronta e modelos (informações do mês, DAE, mensalidade, férias, 13º).
 
 ## 3. Portal do Cliente

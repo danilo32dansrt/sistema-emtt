@@ -79,6 +79,7 @@ export function BotaoAcao({ acao, campos, children, variante = "secundario", con
         {children}
       </BotaoEnviar>
       {estado?.erro && <span className="ml-2 text-xs text-red-700">{estado.erro}</span>}
+      {estado?.ok && estado.mensagem && <span className="ml-2 text-xs text-emerald-700">{estado.mensagem}</span>}
     </form>
   );
 }

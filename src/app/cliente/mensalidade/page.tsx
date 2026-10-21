@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { gerarPixCopiaECola } from "@/lib/pix";
 import { configuracao } from "@/lib/tabelas-db";
 import { CopiarTexto } from "@/components/CopiarTexto";
+import { cobrancaAtiva } from "@/lib/inter/regras";
 
 export const metadata = { title: "Mensalidade" };
 
@@ -17,15 +18,17 @@ export default async function Mensalidade() {
   const abertas = lista.filter((m) => m.status === "ABERTO");
   const pix = await Promise.all(
     abertas.map(async (m) => {
+      // Cobrança do Banco Inter: Pix com baixa automática + boleto
+      if (m.pixCopiaECola && cobrancaAtiva(m.interSituacao)) return { id: m.id, codigo: m.pixCopiaECola, qr: await QRCode.toDataURL(m.pixCopiaECola, { margin: 1, width: 240 }), inter: true };
       if (!cfg.chavePix) return null;
       const codigo = gerarPixCopiaECola({ chave: cfg.chavePix, nome: cfg.nomePix ?? cfg.nomeConsultoria, cidade: cfg.cidadePix ?? cfg.cidade ?? "BRASIL", valor: num(m.valor), txid: m.txid ?? `MENS${m.ano}${String(m.mes).padStart(2, "0")}`, descricao: `Mensalidade ${formatarCompetencia(m.ano, m.mes)}` });
-      return { id: m.id, codigo, qr: await QRCode.toDataURL(codigo, { margin: 1, width: 240 }) };
+      return { id: m.id, codigo, qr: await QRCode.toDataURL(codigo, { margin: 1, width: 240 }), inter: false };
     }),
   );
   return (
     <>
       <Titulo>Mensalidade da consultoria</Titulo>
-      {!cfg.chavePix && abertas.length > 0 && <div className="mb-4"><Aviso tipo="aviso">O consultor ainda não cadastrou a chave Pix. Fale com ele pelo chat.</Aviso></div>}
+      {!cfg.chavePix && !abertas.some((m) => m.pixCopiaECola) && abertas.length > 0 && <div className="mb-4"><Aviso tipo="aviso">O consultor ainda não cadastrou a chave Pix. Fale com ele pelo chat.</Aviso></div>}
       <div className="space-y-4">
         {abertas.map((m, i) => (
           <Cartao key={m.id} titulo={`${formatarCompetencia(m.ano, m.mes)} — ${formatarMoeda(num(m.valor))}`}>
@@ -37,7 +40,14 @@ export default async function Mensalidade() {
                 <div className="w-full min-w-0">
                   <p className="text-sm font-semibold">Pix copia e cola</p>
                   <CopiarTexto texto={pix[i]!.codigo} />
-                  <p className="mt-2 text-xs text-slate-500">Depois de pagar, o consultor dá baixa. Dúvidas? Use o chat.</p>
+                  {pix[i]!.inter && m.linhaDigitavel && (
+                    <>
+                      <p className="mt-3 text-sm font-semibold">Ou pague pelo boleto (linha digitável)</p>
+                      <CopiarTexto texto={m.linhaDigitavel} />
+                      <a className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 text-sm font-semibold" href={`/api/inter/boleto/${m.id}`} target="_blank" rel="noreferrer">Baixar boleto em PDF</a>
+                    </>
+                  )}
+                  <p className="mt-2 text-xs text-slate-500">{pix[i]!.inter ? "Assim que o banco confirmar o pagamento, a mensalidade aparece como paga aqui — não precisa avisar." : "Depois de pagar, o consultor dá baixa. Dúvidas? Use o chat."}</p>
                 </div>
               </div>
             )}

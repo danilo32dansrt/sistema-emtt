@@ -146,6 +146,13 @@ model Configuracao {
   diaEmissaoGuias      Int     @default(4)
   /// Meses em que uma medida disciplinar antiga ainda pesa integralmente na recomendação
   mesesPesoDisciplinar Int     @default(12)
+  /// Cobrança automática das mensalidades pela API do Banco Inter (credenciais no .env)
+  cobrancaInter        Boolean @default(false)
+  /// Multa (%) e juros ao mês (%) das mensalidades em atraso — condição comercial do contrato
+  multaMensalidade     Decimal @default(2) @db.Decimal(5, 2)
+  jurosMensalidade     Decimal @default(1) @db.Decimal(5, 2)
+  /// Dias após o vencimento em que o Inter cancela sozinho a cobrança não paga (0 a 60)
+  diasBaixaInter       Int     @default(30)
 }
 
 /// Tabela única de parâmetros legais com data de vigência (histórico: uma linha por vigência).
@@ -561,6 +568,13 @@ model Mensalidade {
   lembreteEnviadoEm DateTime?
   observacoes       String?
   criadoEm          DateTime       @default(now())
+  /// Cobrança (boleto com Pix) emitida pela API do Banco Inter
+  interCodigo       String?        @unique
+  interSituacao     String?
+  linhaDigitavel    String?
+  pixCopiaECola     String?
+  interAtualizadoEm DateTime?
+  interErro         String?
 
   @@unique([clienteId, ano, mes])
   @@index([status, vencimento])

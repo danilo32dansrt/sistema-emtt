@@ -6,7 +6,8 @@ import { erroParaEstado, type EstadoAcao } from "@/lib/acoes";
 import { registrarAtividade } from "@/lib/atividade";
 import { exigirConsultor } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
-import { dadosDoForm, moeda, texto, textoOpcional } from "@/lib/formularios";
+import { checkbox, dadosDoForm, moeda, numero, texto, textoOpcional } from "@/lib/formularios";
+import { configInter, consultarWebhook, ErroInter, registrarWebhook } from "@/lib/inter/api";
 
 export async function salvarConfiguracao(_: EstadoAcao, fd: FormData): Promise<EstadoAcao> {
   const u = await exigirConsultor();
@@ -52,6 +53,49 @@ export async function salvarModelo(_: EstadoAcao, fd: FormData): Promise<EstadoA
     await prisma.modeloMensagem.upsert({ where: { chave: d.chave }, create: d, update: d });
     revalidatePath("/consultor/configuracoes");
     return { ok: true, mensagem: "Modelo salvo." };
+  } catch (e) {
+    return erroParaEstado(e);
+  }
+}
+
+export async function salvarCobrancaInter(_: EstadoAcao, fd: FormData): Promise<EstadoAcao> {
+  const u = await exigirConsultor();
+  try {
+    const d = z.object({ cobrancaInter: checkbox, multaMensalidade: numero("a multa", 0, 10), jurosMensalidade: numero("os juros", 0, 10), diasBaixaInter: numero("os dias para baixa", 0, 60) }).parse(dadosDoForm(fd));
+    if (d.cobrancaInter && !configInter().configurado) return { erro: `Antes de ligar, coloque as credenciais do Inter no .env (faltam: ${configInter().faltando.join(", ")}).` };
+    const dados = { ...d, diasBaixaInter: Math.trunc(d.diasBaixaInter) };
+    await prisma.configuracao.upsert({ where: { id: "principal" }, create: { id: "principal", ...dados }, update: dados });
+    await registrarAtividade({ usuarioId: u.id, acao: "CONFIGURACAO", descricao: `Cobrança automática pelo Inter ${d.cobrancaInter ? "ligada" : "desligada"}` });
+    revalidatePath("/consultor/configuracoes");
+    revalidatePath("/consultor/financeiro");
+    return { ok: true, mensagem: "Cobrança automática salva." };
+  } catch (e) {
+    return erroParaEstado(e);
+  }
+}
+
+/** Confere credenciais e certificado pedindo um token e lendo o webhook cadastrado no banco. */
+export async function testarConexaoInter(): Promise<EstadoAcao> {
+  await exigirConsultor();
+  try {
+    const w = await consultarWebhook().catch((e: unknown) => (e instanceof ErroInter && e.status === 404 ? null : Promise.reject(e)));
+    return { ok: true, mensagem: `Conexão com o Inter funcionando (${configInter().ambiente === "producao" ? "produção" : "testes"}). ${w ? "Aviso de pagamento cadastrado." : "Falta cadastrar o aviso de pagamento (webhook)."}` };
+  } catch (e) {
+    return erroParaEstado(e);
+  }
+}
+
+/** Cadastra no Inter o endereço que recebe o aviso de pagamento (precisa de APP_URL com https e INTER_WEBHOOK_TOKEN). */
+export async function cadastrarWebhookInter(): Promise<EstadoAcao> {
+  const u = await exigirConsultor();
+  const app = (process.env.APP_URL ?? "").replace(/\/$/, "");
+  const tokenWebhook = process.env.INTER_WEBHOOK_TOKEN ?? "";
+  if (!app.startsWith("https://")) return { erro: "O APP_URL precisa ser o endereço público com https (ex.: https://seusistema.vercel.app)." };
+  if (tokenWebhook.length < 16) return { erro: "Defina INTER_WEBHOOK_TOKEN no .env com pelo menos 16 caracteres (gere com: openssl rand -hex 24)." };
+  try {
+    await registrarWebhook(`${app}/api/inter/webhook?token=${encodeURIComponent(tokenWebhook)}`);
+    await registrarAtividade({ usuarioId: u.id, acao: "CONFIGURACAO", descricao: "Aviso de pagamento (webhook) cadastrado no Inter" });
+    return { ok: true, mensagem: "Aviso de pagamento cadastrado no Inter." };
   } catch (e) {
     return erroParaEstado(e);
   }

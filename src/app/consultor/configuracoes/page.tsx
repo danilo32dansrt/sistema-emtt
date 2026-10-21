@@ -1,15 +1,17 @@
 import { BotaoAcao, Formulario } from "@/components/Formulario";
-import { AreaTexto, Campo, Cartao, Celula, Grade, LinkBotao, Selecao, Tabela, Titulo } from "@/components/ui";
+import { AreaTexto, Aviso, Campo, Cartao, Celula, Grade, LinkBotao, Marcador, Selecao, Selo, Tabela, Titulo } from "@/components/ui";
 import { formatarMoeda } from "@/lib/calculos";
 import { num } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
 import { configuracao, modelosMensagem } from "@/lib/tabelas-db";
-import { removerPreco, salvarConfiguracao, salvarModelo, salvarPreco } from "./acoes";
+import { configInter } from "@/lib/inter/api";
+import { cadastrarWebhookInter, removerPreco, salvarCobrancaInter, salvarConfiguracao, salvarModelo, salvarPreco, testarConexaoInter } from "./acoes";
 
 export const metadata = { title: "Configurações" };
 
 export default async function Configuracoes() {
   const [cfg, precos, modelos] = await Promise.all([configuracao(), prisma.tabelaPreco.findMany({ where: { ativo: true }, orderBy: { servico: "asc" } }), modelosMensagem()]);
+  const inter = configInter();
   return (
     <>
       <Titulo acoes={<LinkBotao variante="secundario" href="/consultor/conta">Minha senha</LinkBotao>}>Configurações</Titulo>
@@ -35,6 +37,27 @@ export default async function Configuracoes() {
             </Grade>
           </Formulario>
         </Cartao>
+
+        <div id="inter">
+          <Cartao titulo="Cobrança automática das mensalidades (Banco Inter PJ)" acoes={inter.configurado ? <Selo cor={inter.ambiente === "producao" ? "verde" : "amarelo"}>{inter.ambiente === "producao" ? "produção" : "ambiente de testes"}</Selo> : <Selo>não configurado</Selo>}>
+            <p className="mb-3 text-sm text-slate-600">O sistema emite todo mês a cobrança de cada cliente (Pix com QR Code + boleto) pela conta PJ do Inter e dá baixa sozinho quando o pagamento cai. As chaves de acesso ficam só no arquivo <code>.env</code>, nunca aqui na tela.</p>
+            {!inter.configurado && <div className="mb-3"><Aviso tipo="aviso" titulo="Falta configurar no .env">{inter.faltando.join(", ")}. Veja o passo a passo no README, seção “Cobrança automática pelo Banco Inter”.</Aviso></div>}
+            <Formulario acao={salvarCobrancaInter}>
+              <Marcador rotulo="Emitir as cobranças pelo Inter automaticamente (todo dia 1º e ao gerar as mensalidades)" name="cobrancaInter" defaultChecked={cfg.cobrancaInter} disabled={!inter.configurado && !cfg.cobrancaInter} />
+              <Grade colunas={3}>
+                <Campo rotulo="Multa por atraso (%)" name="multaMensalidade" inputMode="decimal" defaultValue={String(num(cfg.multaMensalidade)).replace(".", ",")} ajuda="Conforme o contrato. Em relação de consumo (CDC, art. 52), a multa é limitada a 2%." />
+                <Campo rotulo="Juros ao mês (%)" name="jurosMensalidade" inputMode="decimal" defaultValue={String(num(cfg.jurosMensalidade)).replace(".", ",")} ajuda="Conforme o contrato (usualmente 1% ao mês)." />
+                <Campo rotulo="Cancelar sozinho após (dias)" name="diasBaixaInter" type="number" min={0} max={60} defaultValue={cfg.diasBaixaInter} ajuda="Dias depois do vencimento em que o banco tira do ar a cobrança não paga (0 a 60)." />
+              </Grade>
+            </Formulario>
+            {inter.configurado && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <BotaoAcao acao={testarConexaoInter}>Testar conexão</BotaoAcao>
+                <BotaoAcao acao={cadastrarWebhookInter}>Cadastrar aviso de pagamento no Inter</BotaoAcao>
+              </div>
+            )}
+          </Cartao>
+        </div>
 
         <Cartao titulo="Tabela de preços">
           <Tabela cabecalho={["Serviço", "Valor", "Unidade", ""]} vazio="Nenhum preço cadastrado.">

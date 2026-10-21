@@ -81,6 +81,30 @@ São 95 testes. O principal confere o caso real de fevereiro/2026: proporcional 
    `npm run db:seed` — ou `npx tsx prisma/seed.ts --somente-tabelas` para carregar só as tabelas anuais, sem dados de exemplo.
 6. A rotina diária (`/api/cron/diario`) já está agendada no `vercel.json` (07h de Brasília). A Vercel envia o `CRON_SECRET` automaticamente.
 
+## Cobrança automática pelo Banco Inter (mensalidades)
+
+Com a conta **PJ** do Inter, o sistema emite todo mês a cobrança de cada cliente (**Pix com QR Code + boleto**)
+e dá **baixa sozinho** quando o pagamento cai. Cartão de crédito não está na API do Inter: use o link de pagamento
+do app Inter Empresas e dê baixa manual (botão "Pago").
+
+1. **No Inter**: Internet Banking Inter Empresas (computador) → *Soluções para sua empresa* → *Nova integração*.
+   Marque as permissões de **Cobrança (boleto com Pix) — consulta e emissão** e **Webhook**.
+   Baixe o **certificado (.crt)**, a **chave (.key)** e anote o **Client ID** e o **Client Secret**.
+   Nunca envie esses dados por chat ou e-mail: eles dão acesso à conta da empresa.
+2. **No `.env` (e na Vercel → Environment Variables)**: preencha as variáveis `INTER_*` do `.env.example`.
+   O certificado e a chave vão em base64: `base64 -w0 arquivo.crt` (Linux) ou `base64 -i arquivo.crt` (Mac).
+   Comece com `INTER_AMBIENTE="sandbox"` (testes, sem dinheiro de verdade; a integração de testes é criada no próprio portal do Inter).
+3. **No sistema**: *Configurações → Cobrança automática* → **Testar conexão** → **Cadastrar aviso de pagamento no Inter**
+   (precisa do `APP_URL` público com https e do `INTER_WEBHOOK_TOKEN`) → marque **Emitir as cobranças pelo Inter** e salve.
+4. **Testar**: em *Financeiro*, gere as mensalidades, clique em **Emitir cobrança** e depois em **Simular Pix (teste)**
+   (só aparece no ambiente de testes). A mensalidade deve virar "pago" sozinha.
+5. **Para valer**: troque para `INTER_AMBIENTE="producao"` com as credenciais da integração de produção e cadastre o aviso de pagamento de novo.
+
+Como funciona: no dia 1º a rotina diária gera as mensalidades e emite as cobranças; o Inter avisa o sistema quando o
+cliente paga (o sistema confirma consultando o banco antes de dar baixa) e, por segurança, a rotina diária confere de
+novo as cobranças pendentes. O cliente precisa ter **CPF/CNPJ, endereço, cidade, UF e CEP** no cadastro. Ao dar baixa
+manual (pagamento por outro meio), o sistema cancela a cobrança no Inter para evitar pagamento em dobro.
+
 ---
 
 ## Antes de vender o sistema

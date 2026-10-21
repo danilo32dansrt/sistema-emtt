@@ -3,14 +3,17 @@ import { exigirConsultor } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
 import { quantidadeParametrosPendentes } from "@/lib/servicos/parametros";
 
+export const metadata = { manifest: "/manifest-consultor.webmanifest", appleWebApp: { capable: true, title: "Consultoria", statusBarStyle: "default" as const } };
+
 export default async function LayoutConsultor({ children }: { children: React.ReactNode }) {
   const u = await exigirConsultor();
-  const [ajustes, justificativas, mensagens, disciplinar, parametrosPendentes] = await Promise.all([
+  const [ajustes, justificativas, mensagens, disciplinar, parametrosPendentes, avisos] = await Promise.all([
     prisma.ajustePonto.count({ where: { status: "PENDENTE" } }),
     prisma.justificativa.count({ where: { status: "PENDENTE" } }),
     prisma.mensagem.count({ where: { lidaEm: null, autor: { papel: "CLIENTE" } } }),
     prisma.ocorrenciaDisciplinar.count({ where: { status: "EM_ANALISE_CONSULTOR" } }),
     quantidadeParametrosPendentes(),
+    prisma.notificacao.count({ where: { usuarioId: u.id, lidaEm: null } }),
   ]);
   return (
     <Casca
@@ -18,6 +21,7 @@ export default async function LayoutConsultor({ children }: { children: React.Re
       usuario={u.nome}
       itens={[
         { href: "/consultor", rotulo: "Painel", icone: "🏠" },
+        { href: "/consultor/avisos", rotulo: "Avisos", icone: "🔔", contador: avisos },
         { href: "/consultor/clientes", rotulo: "Clientes", icone: "👥" },
         { href: "/consultor/rotina", rotulo: "Rotina mensal", icone: "✅" },
         { href: "/consultor/agenda", rotulo: "Agenda e alertas", icone: "📅" },

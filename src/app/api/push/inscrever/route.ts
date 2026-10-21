@@ -5,10 +5,10 @@ import { prisma } from "@/lib/db";
 
 const Inscricao = z.object({ endpoint: z.string().url().max(1000), keys: z.object({ p256dh: z.string().min(10).max(200), auth: z.string().min(8).max(100) }) });
 
-/** Guarda o celular que aceitou receber notificações (patrão e empregada). */
+/** Guarda o celular que aceitou receber notificações (consultor, patrão e empregada). */
 export async function POST(req: Request) {
   const u = await usuarioAtual();
-  if (!u || (u.papel !== "CLIENTE" && u.papel !== "EMPREGADO")) return new NextResponse("Faça login.", { status: 401 });
+  if (!u) return new NextResponse("Faça login.", { status: 401 });
   const r = Inscricao.safeParse(await req.json().catch(() => null));
   if (!r.success) return new NextResponse("Inscrição inválida.", { status: 400 });
   const { endpoint, keys } = r.data;

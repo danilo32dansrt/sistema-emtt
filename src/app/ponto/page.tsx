@@ -1,9 +1,11 @@
 import { AtivarAvisos } from "@/components/AtivarAvisos";
+import { Pendencias } from "@/components/Pendencias";
 import { Aviso, Cartao } from "@/components/ui";
 import { exigirEmpregado } from "@/lib/auth/sessao";
 import { addDias, hojeBrasil } from "@/lib/calculos";
 import { prisma } from "@/lib/db";
 import { chavePublicaPush } from "@/lib/notificacoes";
+import { pendenciasDaEmpregada } from "@/lib/servicos/lembretes";
 import { aceitarPrivacidade } from "./acoes";
 import { RelogioPonto } from "./RelogioPonto";
 import { TextoPrivacidade } from "./TextoPrivacidade";
@@ -34,8 +36,11 @@ export default async function PaginaPonto() {
     orderBy: { dataHora: "asc" },
     select: { tipo: true, dataHora: true },
   });
+  // Pendências de dias anteriores (as de hoje se resolvem no próprio botão de marcar)
+  const pendencias = (await pendenciasDaEmpregada(emp.id)).filter((p) => p.link !== "/ponto");
   return (
     <>
+      <Pendencias itens={pendencias} titulo="Resolva o seu ponto" />
       <RelogioPonto
         nome={emp.nome}
         exigirSelfie={emp.exigirSelfie}

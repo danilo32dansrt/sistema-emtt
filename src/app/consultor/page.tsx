@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { AtivarAvisos } from "@/components/AtivarAvisos";
 import { Cartao, Indicador, Selo, Titulo, Vazio } from "@/components/ui";
 import {
   addDias, competenciaAnterior, diferencaDias, ETAPAS_CHECKLIST, formatarCompetencia, formatarData, formatarMoeda, hojeBrasil, ROTULOS_EVENTO, situacaoChecklist,
 } from "@/lib/calculos";
 import { prisma } from "@/lib/db";
+import { chavePublicaPush } from "@/lib/notificacoes";
 import { num } from "@/lib/conversao";
 import { agendaDoBanco } from "@/lib/servicos/agenda";
 import { competenciaPadrao } from "@/lib/servicos/competencia";
@@ -92,6 +94,7 @@ export default async function Painel() {
   return (
     <>
       <Titulo subtitulo={`Hoje é ${formatarData(hoje)}. Competência em foco: ${formatarCompetencia(comp.ano, comp.mes)}.`}>Painel geral</Titulo>
+      <div className="mb-4 max-w-xl"><AtivarAvisos chavePublica={chavePublicaPush()} compacto /></div>
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Indicador rotulo="Clientes ativos" valor={clientes.length} href="/consultor/clientes" detalhe={`${empregados.length} empregado(s)`} />
         <Indicador rotulo="Rotina atrasada" valor={atrasadosChecklist} cor={atrasadosChecklist ? "vermelho" : "verde"} href="/consultor/rotina" detalhe={`${pendentesChecklist} em andamento`} />

@@ -62,6 +62,8 @@ self.addEventListener("push", (evento) => {
       icon: "/icone.svg",
       badge: "/icone.svg",
       tag: dados.tag,
+      renotify: Boolean(dados.tag),
+      actions: dados.acao ? [{ action: "abrir", title: dados.acao }] : [],
       data: { link: dados.link || "/" },
     }),
   );

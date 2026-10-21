@@ -107,7 +107,10 @@ manual (pagamento por outro meio), o sistema cancela a cobrança no Inter para e
 
 ## Avisos no celular (patrão e empregada)
 
-Patrão e empregada usam o sistema como **aplicativo no celular** (instalável pelo navegador; o consultor usa só a web).
+Consultor, patrão e empregada usam o sistema também como **aplicativo no celular** (instalável pelo navegador; é o mesmo
+sistema da web — tudo o que é feito num aparece no outro). Os avisos chegam com o app fechado e o celular bloqueado.
+Enquanto uma pendência continuar (entrada, intervalo, saída, dia sem marcação, pedido sem resposta, guias, DAE), o
+lembrete se repete a cada hora até alguém resolver, e a pendência aparece na tela inicial com o botão que resolve.
 O sistema avisa: hora de bater o ponto, de sair e voltar do intervalo, de marcar a saída; dia sem marcação ou incompleto
 (para os dois); pedidos de ajuste e justificativas (para o patrão) e a resposta (para a empregada); DAE a vencer, vencendo
 e atrasado. Tudo fica também na tela **Avisos** de cada um.

@@ -1,0 +1,26 @@
+{
+  "name": "Consultoria eSocial Doméstico",
+  "short_name": "Consultoria",
+  "description": "Painel do consultor: guias do DAE, rotina mensal, pedidos e avisos",
+  "lang": "pt-BR",
+  "id": "/consultor",
+  "start_url": "/consultor",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#1f58bd",
+  "icons": [
+    {
+      "src": "/icone.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icone-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -70,7 +70,7 @@ export function AtivarAvisos({ chavePublica, compacto = false }: { chavePublica:
       {estado === "desligado" && (
         <>
           <p className="font-semibold text-marca-900">Receba lembretes no celular</p>
-          <p className="mt-1 text-slate-700">Hora de bater o ponto, intervalo, DAE a pagar, pedidos de ajuste — o sistema avisa para nada ser esquecido.</p>
+          <p className="mt-1 text-slate-700">Ponto, intervalo, DAE, guias e pedidos de ajuste — o sistema avisa, mesmo com o app fechado e o celular bloqueado, para nada ser esquecido.</p>
           <button onClick={ligar} className="mt-3 min-h-12 w-full rounded-xl bg-marca-600 px-4 font-semibold text-white">🔔 Ativar avisos no celular</button>
         </>
       )}

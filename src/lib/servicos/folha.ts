@@ -17,6 +17,7 @@ export async function folhaDoMes(e: Empregado, ano: number, mes: number, l?: Lan
     tabela,
     faltasInjustificadas: l?.faltasInjustificadas,
     semanasComFalta: l?.semanasComFalta,
+    diasSuspensao: l?.diasSuspensao,
     atrasoMinutos: l?.atrasoMinutos,
     horasExtras50: num(l?.horasExtras50),
     horasExtras100: num(l?.horasExtras100),

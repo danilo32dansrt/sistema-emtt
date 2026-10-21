@@ -4,6 +4,7 @@ export * from "./checklist";
 export * from "./datas";
 export * from "./decimo-terceiro";
 export * from "./diagnostico";
+export * from "./disciplinar";
 export * from "./dinheiro";
 export * from "./encargos";
 export * from "./ferias";

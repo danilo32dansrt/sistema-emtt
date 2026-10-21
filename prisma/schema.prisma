@@ -129,22 +129,24 @@ model Atividade {
 // ---------------------------------------------------------------------------
 
 model Configuracao {
-  id                 String  @id @default("principal")
-  nomeConsultoria    String  @default("Consultoria eSocial Doméstico")
-  documento          String? // CPF ou CNPJ do consultor
-  telefone           String?
-  email              String?
-  endereco           String?
-  cidade             String?
-  uf                 String?
-  chavePix           String?
-  nomePix            String?
-  cidadePix          String?
+  id                   String  @id @default("principal")
+  nomeConsultoria      String  @default("Consultoria eSocial Doméstico")
+  documento            String? // CPF ou CNPJ do consultor
+  telefone             String?
+  email                String?
+  endereco             String?
+  cidade               String?
+  uf                   String?
+  chavePix             String?
+  nomePix              String?
+  cidadePix            String?
   /// "CLT" (30 dias) ou "LC150" (tabela do art. 3º, § 3º) para férias do tempo parcial
-  regraFeriasParcial String  @default("CLT")
-  selicMensal        Decimal @default(1.0) @db.Decimal(6, 4)
-  diaLimiteInfo      Int     @default(30)
-  diaEmissaoGuias    Int     @default(4)
+  regraFeriasParcial   String  @default("CLT")
+  selicMensal          Decimal @default(1.0) @db.Decimal(6, 4)
+  diaLimiteInfo        Int     @default(30)
+  diaEmissaoGuias      Int     @default(4)
+  /// Meses em que uma medida disciplinar antiga ainda pesa integralmente na recomendação
+  mesesPesoDisciplinar Int     @default(12)
 }
 
 /// Salário mínimo, INSS e salário-família por ano — editáveis sem mexer no código.
@@ -207,6 +209,7 @@ model Cliente {
   atualizadoEm       DateTime         @updatedAt
 
   empregados     Empregado[]
+  ocorrencias    OcorrenciaDisciplinar[]
   usuarios       Usuario[]
   mensalidades   Mensalidade[]
   servicos       ServicoAvulso[]
@@ -273,6 +276,7 @@ model Empregado {
   justificativas Justificativa[]
   espelhos       EspelhoPonto[]
   documentos     Documento[]
+  ocorrencias    OcorrenciaDisciplinar[]
 
   @@index([clienteId])
 }
@@ -367,6 +371,7 @@ model LancamentoMensal {
   horasNoturnas           Decimal   @default(0) @db.Decimal(8, 2)
   horasViagem             Decimal   @default(0) @db.Decimal(8, 2)
   horasIntervaloSuprimido Decimal   @default(0) @db.Decimal(8, 2)
+  diasSuspensao           Int       @default(0)
   adiantamento            Decimal   @default(0) @db.Decimal(12, 2)
   outrosProventos         Decimal   @default(0) @db.Decimal(12, 2)
   outrosDescontos         Decimal   @default(0) @db.Decimal(12, 2)
@@ -631,4 +636,53 @@ model Artigo {
   publico      Boolean  @default(true)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Gestão disciplinar (LC 150/2015, art. 27; CLT subsidiária)
+// ---------------------------------------------------------------------------
+
+model OcorrenciaDisciplinar {
+  id                  String    @id @default(cuid())
+  clienteId           String
+  cliente             Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  empregadoId         String
+  empregado           Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  dataFato            DateTime  @db.Date
+  horaFato            String?
+  local               String?
+  /// Data em que o empregador soube da falta (conta a imediatidade)
+  dataCiencia         DateTime  @db.Date
+  descricao           String
+  testemunhas         String?
+  provasIds           String[]  @default([])
+  tipoFalta           String
+  gravidade           String
+  versaoEmpregado     String?
+  prazoDefesa         DateTime? @db.Date
+  defesaRegistradaEm  DateTime?
+  recomendacao        Json?
+  /// ORIENTACAO_VERBAL, ADVERTENCIA_ESCRITA, SUSPENSAO, JUSTA_CAUSA, NENHUMA
+  medida              String?
+  diasSuspensao       Int?
+  inicioSuspensao     DateTime? @db.Date
+  justificativaMedida String?
+  /// REGISTRADA, AGUARDANDO_DEFESA, EM_ANALISE_CONSULTOR, JUSTA_CAUSA_APROVADA, JUSTA_CAUSA_NEGADA, MEDIDA_APLICADA, ARQUIVADA
+  status              String    @default("REGISTRADA")
+  documentoId         String?
+  documentosIds       String[]  @default([])
+  assinaturaForma     String?
+  recusaAssinatura    Boolean   @default(false)
+  testemunhasRecusa   String?
+  parecerConsultor    String?
+  revisadoPorId       String?
+  revisadoEm          DateTime?
+  aplicadaEm          DateTime?
+  criadoPorId         String?
+  criadoEm            DateTime  @default(now())
+  atualizadoEm        DateTime  @updatedAt
+
+  @@index([clienteId, criadoEm])
+  @@index([empregadoId, dataFato])
+  @@index([status])
 }

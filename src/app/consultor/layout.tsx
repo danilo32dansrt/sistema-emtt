@@ -4,10 +4,11 @@ import { prisma } from "@/lib/db";
 
 export default async function LayoutConsultor({ children }: { children: React.ReactNode }) {
   const u = await exigirConsultor();
-  const [ajustes, justificativas, mensagens] = await Promise.all([
+  const [ajustes, justificativas, mensagens, disciplinar] = await Promise.all([
     prisma.ajustePonto.count({ where: { status: "PENDENTE" } }),
     prisma.justificativa.count({ where: { status: "PENDENTE" } }),
     prisma.mensagem.count({ where: { lidaEm: null, autor: { papel: "CLIENTE" } } }),
+    prisma.ocorrenciaDisciplinar.count({ where: { status: "EM_ANALISE_CONSULTOR" } }),
   ]);
   return (
     <Casca
@@ -22,6 +23,7 @@ export default async function LayoutConsultor({ children }: { children: React.Re
         { href: "/consultor/simuladores", rotulo: "Simuladores", icone: "📊" },
         { href: "/consultor/ponto", rotulo: "Ponto", icone: "⏱️", contador: ajustes + justificativas },
         { href: "/consultor/documentos", rotulo: "Documentos", icone: "📄" },
+        { href: "/consultor/disciplinar", rotulo: "Gestão disciplinar", icone: "⚖️", contador: disciplinar },
         { href: "/consultor/diagnostico", rotulo: "Diagnóstico de riscos", icone: "🩺" },
         { href: "/consultor/financeiro", rotulo: "Financeiro", icone: "💰" },
         { href: "/consultor/captacao", rotulo: "Captação", icone: "🎯" },

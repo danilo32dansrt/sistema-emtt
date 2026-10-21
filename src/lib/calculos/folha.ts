@@ -25,6 +25,8 @@ export interface EntradaFolha {
   tabela: TabelaAnual;
   faltasInjustificadas?: number;
   semanasComFalta?: number;
+  /** Dias de suspensão disciplinar no mês (descontados). */
+  diasSuspensao?: number;
   atrasoMinutos?: number;
   horasExtras50?: number;
   horasExtras100?: number;
@@ -133,6 +135,10 @@ export function calcularFolhaMensal(e: EntradaFolha): ResultadoFolha {
     const f = descontoFaltas(e.salario, e.faltasInjustificadas ?? 0, e.semanasComFalta ?? 0);
     if (f.faltas) descontos.push({ descricao: `Faltas injustificadas (${e.faltasInjustificadas} dia(s))`, valor: f.faltas, formula: f.memoria.linhas[0]?.formula, incideInss: true, incideFgts: true, rubrica: "Faltas" });
     if (f.dsr) descontos.push({ descricao: `DSR perdido (${e.semanasComFalta} semana(s))`, valor: f.dsr, formula: f.memoria.linhas.at(-1)?.formula, incideInss: true, incideFgts: true, rubrica: "DSR - desconto" });
+  }
+  if (e.diasSuspensao) {
+    const v = arred((e.salario / 30) * e.diasSuspensao);
+    descontos.push({ descricao: `Suspensão disciplinar (${e.diasSuspensao} dia(s))`, valor: v, formula: `${formatarMoeda(e.salario)} ÷ 30 × ${e.diasSuspensao}`, incideInss: true, incideFgts: true, rubrica: "Faltas" });
   }
   if (e.atrasoMinutos) {
     const a = descontoAtrasos(e.salario, e.horasSemanais, e.atrasoMinutos);

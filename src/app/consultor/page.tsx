@@ -75,6 +75,10 @@ export default async function Painel() {
   for (const m of mensalidadesAtrasadas) {
     pendencias.push({ prioridade: 3, texto: `Mensalidade ${formatarCompetencia(m.ano, m.mes)} em aberto — ${m.cliente.nome}`, detalhe: `${formatarMoeda(num(m.valor))}, venceu em ${formatarData(m.vencimento)}`, href: "/consultor/financeiro" });
   }
+  const disciplinares = await prisma.ocorrenciaDisciplinar.findMany({ where: { OR: [{ status: "EM_ANALISE_CONSULTOR" }, { gravidade: "gravissima", status: { in: ["REGISTRADA", "AGUARDANDO_DEFESA"] } }] }, include: { empregado: { select: { nome: true } }, cliente: { select: { nome: true } } } });
+  for (const o of disciplinares) {
+    pendencias.push({ prioridade: 1, texto: `${o.status === "EM_ANALISE_CONSULTOR" ? "Revisar dossiê de justa causa" : "Ocorrência gravíssima registrada"} — ${o.empregado.nome} (${o.cliente.nome})`, href: `/consultor/disciplinar/${o.id}` });
+  }
   if (ajustesPendentes) pendencias.push({ prioridade: 2, texto: `${ajustesPendentes} ajuste(s) de ponto aguardando o empregador`, href: "/consultor/ponto" });
 
   pendencias.sort((a, b) => a.prioridade - b.prioridade);

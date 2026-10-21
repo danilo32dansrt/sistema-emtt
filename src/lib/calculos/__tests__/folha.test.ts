@@ -44,6 +44,12 @@ describe("folha mensal", () => {
     expect(f.proventos[0].valor).toBe(540.33);
   });
 
+  it("suspensão disciplinar desconta os dias", () => {
+    const f = calcularFolhaMensal({ ano: 2026, mes: 3, salario: 1621, horasSemanais: 44, admissao: data(2025, 1, 1), tabela: t, diasSuspensao: 2 });
+    expect(f.descontos.find((d) => d.descricao.startsWith("Suspensão"))!.valor).toBe(108.07);
+    expect(f.baseInss).toBe(1512.93);
+  });
+
   it("sem vínculo no mês gera tudo zerado", () => {
     const f = calcularFolhaMensal({ ano: 2026, mes: 1, salario: 1621, horasSemanais: 44, admissao: data(2026, 2, 9), tabela: t });
     expect(f.diasTrabalhados).toBe(0);

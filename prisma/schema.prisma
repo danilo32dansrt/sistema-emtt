@@ -1,0 +1,634 @@
+// Banco de dados do Sistema de Gestão eSocial Doméstico.
+// Funciona com qualquer PostgreSQL (Supabase recomendado).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Papel {
+  CONSULTOR
+  CLIENTE
+  EMPREGADO
+}
+
+enum StatusProcuracao {
+  PENDENTE
+  ATIVA
+  VENCIDA
+}
+
+enum Regime {
+  INTEGRAL
+  PARCIAL
+  DOZE_X_TRINTA_SEIS
+}
+
+enum SituacaoEmpregado {
+  ATIVO
+  AFASTADO
+  DESLIGADO
+}
+
+enum TipoMarcacao {
+  ENTRADA
+  SAIDA_INTERVALO
+  RETORNO_INTERVALO
+  SAIDA
+}
+
+enum StatusSolicitacao {
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
+enum StatusCobranca {
+  ABERTO
+  PAGO
+  CANCELADO
+}
+
+enum StatusLead {
+  NOVO
+  CONTATO
+  PROPOSTA
+  NEGOCIACAO
+  GANHO
+  PERDIDO
+}
+
+// ---------------------------------------------------------------------------
+// Acesso
+// ---------------------------------------------------------------------------
+
+model Usuario {
+  id                  String     @id @default(cuid())
+  email               String     @unique
+  senhaHash           String
+  nome                String
+  papel               Papel
+  clienteId           String?
+  cliente             Cliente?   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  empregadoId         String?    @unique
+  empregado           Empregado? @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  ativo               Boolean    @default(true)
+  tentativasFalhas    Int        @default(0)
+  bloqueadoAte        DateTime?
+  trocarSenha         Boolean    @default(false)
+  ultimoAcesso        DateTime?
+  consentimentoLgpdEm DateTime?
+  criadoEm            DateTime   @default(now())
+  atualizadoEm        DateTime   @updatedAt
+
+  atividades  Atividade[]
+  mensagens   Mensagem[]
+  assinaturas Assinatura[]
+
+  @@index([clienteId])
+}
+
+model AcessoLog {
+  id        String   @id @default(cuid())
+  usuarioId String?
+  email     String
+  sucesso   Boolean
+  motivo    String?
+  ip        String?
+  userAgent String?
+  criadoEm  DateTime @default(now())
+
+  @@index([email, criadoEm])
+}
+
+/// Registro de atividades: tudo o que foi feito em cada cliente (protege o consultor e atende a LGPD).
+model Atividade {
+  id         String   @id @default(cuid())
+  usuarioId  String?
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  clienteId  String?
+  cliente    Cliente? @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  acao       String
+  entidade   String?
+  entidadeId String?
+  descricao  String
+  ip         String?
+  criadoEm   DateTime @default(now())
+
+  @@index([clienteId, criadoEm])
+  @@index([criadoEm])
+}
+
+// ---------------------------------------------------------------------------
+// Configurações e tabelas
+// ---------------------------------------------------------------------------
+
+model Configuracao {
+  id                 String  @id @default("principal")
+  nomeConsultoria    String  @default("Consultoria eSocial Doméstico")
+  documento          String? // CPF ou CNPJ do consultor
+  telefone           String?
+  email              String?
+  endereco           String?
+  cidade             String?
+  uf                 String?
+  chavePix           String?
+  nomePix            String?
+  cidadePix          String?
+  /// "CLT" (30 dias) ou "LC150" (tabela do art. 3º, § 3º) para férias do tempo parcial
+  regraFeriasParcial String  @default("CLT")
+  selicMensal        Decimal @default(1.0) @db.Decimal(6, 4)
+  diaLimiteInfo      Int     @default(30)
+  diaEmissaoGuias    Int     @default(4)
+}
+
+/// Salário mínimo, INSS e salário-família por ano — editáveis sem mexer no código.
+model TabelaAnual {
+  ano                  Int      @id
+  salarioMinimo        Decimal  @db.Decimal(12, 2)
+  /// [{ "ate": 1621.00, "aliquota": 7.5 }, ...]
+  faixasInss           Json
+  salarioFamiliaLimite Decimal  @db.Decimal(12, 2)
+  salarioFamiliaCota   Decimal  @db.Decimal(12, 2)
+  inssPatronal         Decimal  @default(8) @db.Decimal(5, 2)
+  gilrat               Decimal  @default(0.8) @db.Decimal(5, 2)
+  fgts                 Decimal  @default(8) @db.Decimal(5, 2)
+  fgtsCompensatorio    Decimal  @default(3.2) @db.Decimal(5, 2)
+  arredondamentoDae    String   @default("truncar")
+  observacoes          String?
+  atualizadoEm         DateTime @updatedAt
+}
+
+model TabelaPreco {
+  id        String  @id @default(cuid())
+  servico   String  @unique
+  descricao String?
+  valor     Decimal @db.Decimal(12, 2)
+  /// "mensal", "por_empregado" ou "avulso"
+  unidade   String  @default("avulso")
+  ativo     Boolean @default(true)
+}
+
+model ModeloMensagem {
+  id     String @id @default(cuid())
+  chave  String @unique
+  titulo String
+  texto  String
+}
+
+// ---------------------------------------------------------------------------
+// Clientes e empregados
+// ---------------------------------------------------------------------------
+
+model Cliente {
+  id                 String           @id @default(cuid())
+  nome               String
+  cpf                String
+  telefone           String?
+  email              String?
+  endereco           String?
+  cidade             String?
+  uf                 String?
+  cep                String?
+  inicioContrato     DateTime         @db.Date
+  mensalidade        Decimal          @db.Decimal(12, 2)
+  diaVencimento      Int              @default(10)
+  procuracaoStatus   StatusProcuracao @default(PENDENTE)
+  procuracaoValidade DateTime?        @db.Date
+  observacoes        String?
+  ativo              Boolean          @default(true)
+  anonimizadoEm      DateTime?
+  criadoEm           DateTime         @default(now())
+  atualizadoEm       DateTime         @updatedAt
+
+  empregados     Empregado[]
+  usuarios       Usuario[]
+  mensalidades   Mensalidade[]
+  servicos       ServicoAvulso[]
+  documentos     Documento[]
+  mensagens      Mensagem[]
+  atividades     Atividade[]
+  registrosTempo RegistroTempo[]
+  arquivos       Arquivo[]
+
+  @@index([nome])
+}
+
+model Empregado {
+  id                        String            @id @default(cuid())
+  clienteId                 String
+  cliente                   Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  nome                      String
+  cpf                       String
+  nascimento                DateTime?         @db.Date
+  telefone                  String?
+  funcao                    String
+  cbo                       String
+  admissao                  DateTime          @db.Date
+  salario                   Decimal           @db.Decimal(12, 2)
+  regime                    Regime            @default(INTEGRAL)
+  horasSemanais             Decimal           @db.Decimal(5, 2)
+  /// Horas por dia da semana: { "seg": 8, "ter": 8, ... }
+  jornada                   Json
+  /// Horários previstos: { "seg": { "entrada": "08:00", "saida": "17:00" } }
+  horarios                  Json?
+  situacao                  SituacaoEmpregado @default(ATIVO)
+  desligamento              DateTime?         @db.Date
+  motivoDesligamento        String?
+  diasExperiencia           Int?
+  acordoCompensacao         Boolean           @default(false)
+  acordoIntervaloReduzido   Boolean           @default(false)
+  acordo12x36               Boolean           @default(false)
+  acordoViagem              Boolean           @default(false)
+  residenteNoLocal          Boolean           @default(false)
+  /// Primeiro dia de trabalho da escala 12x36 (para saber os dias alternados)
+  referencia12x36           DateTime?         @db.Date
+  toleranciaMinutos         Int               @default(5)
+  dependentesSalarioFamilia Int               @default(0)
+  custoValeTransporte       Decimal?          @db.Decimal(12, 2)
+  gestante                  Boolean           @default(false)
+  dataPrevistaParto         DateTime?         @db.Date
+  estabilidadeAte           DateTime?         @db.Date
+  estabilidadeMotivo        String?
+  pontoAtivo                Boolean           @default(false)
+  exigirSelfie              Boolean           @default(true)
+  exigirLocalizacao         Boolean           @default(true)
+  observacoes               String?
+  criadoEm                  DateTime          @default(now())
+  atualizadoEm              DateTime          @updatedAt
+
+  usuario        Usuario?
+  historico      HistoricoEmpregado[]
+  ferias         Ferias[]
+  afastamentos   Afastamento[]
+  competencias   Competencia[]
+  lancamentos    LancamentoMensal[]
+  marcacoes      MarcacaoPonto[]
+  ajustes        AjustePonto[]
+  justificativas Justificativa[]
+  espelhos       EspelhoPonto[]
+  documentos     Documento[]
+
+  @@index([clienteId])
+}
+
+model HistoricoEmpregado {
+  id          String    @id @default(cuid())
+  empregadoId String
+  empregado   Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  data        DateTime  @db.Date
+  /// ADMISSAO, ALTERACAO_SALARIAL, ALTERACAO_JORNADA, FERIAS, AFASTAMENTO, OCORRENCIA, DESLIGAMENTO
+  tipo        String
+  descricao   String
+  criadoEm    DateTime  @default(now())
+
+  @@index([empregadoId, data])
+}
+
+model Ferias {
+  id               String    @id @default(cuid())
+  empregadoId      String
+  empregado        Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  inicioAquisitivo DateTime  @db.Date
+  inicioGozo       DateTime  @db.Date
+  dias             Int
+  diasAbono        Int       @default(0)
+  valorLiquido     Decimal?  @db.Decimal(12, 2)
+  pagoEm           DateTime? @db.Date
+  observacoes      String?
+  criadoEm         DateTime  @default(now())
+
+  @@index([empregadoId])
+}
+
+model Afastamento {
+  id          String    @id @default(cuid())
+  empregadoId String
+  empregado   Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  /// ATESTADO, LICENCA_MATERNIDADE, AUXILIO_INCAPACIDADE, ACIDENTE_TRABALHO, OUTRO
+  tipo        String
+  inicio      DateTime  @db.Date
+  fim         DateTime? @db.Date
+  observacoes String?
+  arquivoId   String?
+  criadoEm    DateTime  @default(now())
+
+  @@index([empregadoId])
+}
+
+// ---------------------------------------------------------------------------
+// Rotina mensal
+// ---------------------------------------------------------------------------
+
+/// Checklist mensal por empregado.
+model Competencia {
+  id                         String    @id @default(cuid())
+  empregadoId                String
+  empregado                  Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  ano                        Int
+  mes                        Int
+  infoRecebida               Boolean   @default(false)
+  folhaLancada               Boolean   @default(false)
+  folhaEncerrada             Boolean   @default(false)
+  daeEmitido                 Boolean   @default(false)
+  daeEnviado                 Boolean   @default(false)
+  pagamentoConfirmado        Boolean   @default(false)
+  reciboArquivado            Boolean   @default(false)
+  daeValor                   Decimal?  @db.Decimal(12, 2)
+  daeCodigo                  String?
+  daeArquivoId               String?
+  comprovanteArquivoId       String?
+  clienteInformouPagamentoEm DateTime?
+  observacoes                String?
+  atualizadoEm               DateTime  @updatedAt
+
+  @@unique([empregadoId, ano, mes])
+  @@index([ano, mes])
+}
+
+/// Informações do mês enviadas pelo cliente (ou geradas pelo ponto).
+model LancamentoMensal {
+  id                      String    @id @default(cuid())
+  empregadoId             String
+  empregado               Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  ano                     Int
+  mes                     Int
+  faltasInjustificadas    Int       @default(0)
+  semanasComFalta         Int       @default(0)
+  faltasJustificadas      Int       @default(0)
+  atrasoMinutos           Int       @default(0)
+  horasExtras50           Decimal   @default(0) @db.Decimal(8, 2)
+  horasExtras100          Decimal   @default(0) @db.Decimal(8, 2)
+  horasNoturnas           Decimal   @default(0) @db.Decimal(8, 2)
+  horasViagem             Decimal   @default(0) @db.Decimal(8, 2)
+  horasIntervaloSuprimido Decimal   @default(0) @db.Decimal(8, 2)
+  adiantamento            Decimal   @default(0) @db.Decimal(12, 2)
+  outrosProventos         Decimal   @default(0) @db.Decimal(12, 2)
+  outrosDescontos         Decimal   @default(0) @db.Decimal(12, 2)
+  observacoes             String?
+  /// "CLIENTE", "CONSULTOR" ou "PONTO"
+  origem                  String    @default("CLIENTE")
+  enviadoPorId            String?
+  enviadoEm               DateTime  @default(now())
+  atualizadoEm            DateTime  @updatedAt
+
+  @@unique([empregadoId, ano, mes])
+}
+
+// ---------------------------------------------------------------------------
+// Ponto eletrônico (REP-P — Portaria MTP 671/2021)
+// ---------------------------------------------------------------------------
+
+/// Marcação inalterável: o banco bloqueia UPDATE e DELETE (ver migração).
+model MarcacaoPonto {
+  id              String       @id @default(cuid())
+  /// Número sequencial do registro (NSR)
+  nsr             Int          @unique @default(autoincrement())
+  empregadoId     String
+  empregado       Empregado    @relation(fields: [empregadoId], references: [id], onDelete: Restrict)
+  tipo            TipoMarcacao
+  /// Horário real da marcação (no aparelho, mesmo offline)
+  dataHora        DateTime
+  recebidoEm      DateTime     @default(now())
+  latitude        Float?
+  longitude       Float?
+  precisaoMetros  Float?
+  selfieArquivoId String?
+  /// "ONLINE" ou "OFFLINE"
+  origem          String       @default("ONLINE")
+  dispositivo     String?
+  ip              String?
+  /// Identificador gerado no aparelho (evita duplicar na sincronização offline)
+  idLocal         String       @unique
+  hashAnterior    String?
+  hash            String
+
+  @@index([empregadoId, dataHora])
+}
+
+model AjustePonto {
+  id              String            @id @default(cuid())
+  empregadoId     String
+  empregado       Empregado         @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  data            DateTime          @db.Date
+  /// "INCLUSAO" (marcação esquecida) ou "DESCONSIDERAR" (marcação errada; a original é mantida)
+  tipo            String
+  marcacaoId      String?
+  dataHora        DateTime?
+  tipoMarcacao    TipoMarcacao?
+  justificativa   String
+  status          StatusSolicitacao @default(PENDENTE)
+  solicitadoPorId String?
+  decididoPorId   String?
+  decididoEm      DateTime?
+  motivoDecisao   String?
+  criadoEm        DateTime          @default(now())
+
+  @@index([empregadoId, data])
+}
+
+model Justificativa {
+  id            String            @id @default(cuid())
+  empregadoId   String
+  empregado     Empregado         @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  data          DateTime          @db.Date
+  dataFim       DateTime?         @db.Date
+  /// ATESTADO_MEDICO, CASAMENTO, FALECIMENTO_FAMILIAR, DOACAO_SANGUE, VIAGEM, FOLGA_COMPENSATORIA, OUTRO
+  tipo          String
+  descricao     String
+  arquivoId     String?
+  status        StatusSolicitacao @default(PENDENTE)
+  decididoPorId String?
+  decididoEm    DateTime?
+  criadoEm      DateTime          @default(now())
+
+  @@index([empregadoId, data])
+}
+
+model EspelhoPonto {
+  id                   String    @id @default(cuid())
+  empregadoId          String
+  empregado            Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  ano                  Int
+  mes                  Int
+  resumo               Json
+  hash                 String
+  documentoId          String?
+  geradoEm             DateTime  @default(now())
+  assinadoEmpregadoEm  DateTime?
+  assinadoEmpregadorEm DateTime?
+
+  @@unique([empregadoId, ano, mes])
+}
+
+// ---------------------------------------------------------------------------
+// Arquivos, documentos e assinaturas
+// ---------------------------------------------------------------------------
+
+model Arquivo {
+  id          String   @id @default(cuid())
+  nome        String
+  mime        String
+  tamanho     Int
+  sha256      String
+  dados       Bytes
+  clienteId   String?
+  cliente     Cliente? @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  criadoPorId String?
+  criadoEm    DateTime @default(now())
+
+  @@index([clienteId])
+}
+
+model Documento {
+  id                       String       @id @default(cuid())
+  clienteId                String
+  cliente                  Cliente      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  empregadoId              String?
+  empregado                Empregado?   @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  /// CONTRATO_TRABALHO, ACORDO_COMPENSACAO, ACORDO_12X36, FOLHA_PONTO, ESPELHO_PONTO, AVISO_FERIAS, RECIBO_FERIAS,
+  /// AVISO_PREVIO, RECIBO_13, RECIBO_ADIANTAMENTO, RECIBO_SALARIO, CONTRATO_SERVICO, INFORME_RENDIMENTOS, DAE, COMPROVANTE, OUTRO
+  tipo                     String
+  titulo                   String
+  arquivoId                String
+  hash                     String
+  competencia              String?
+  exigeAssinaturaEmpregado Boolean      @default(false)
+  exigeAssinaturaCliente   Boolean      @default(false)
+  visivelCliente           Boolean      @default(true)
+  visivelEmpregado         Boolean      @default(false)
+  criadoPorId              String?
+  criadoEm                 DateTime     @default(now())
+  assinaturas              Assinatura[]
+
+  @@index([clienteId, criadoEm])
+  @@index([empregadoId])
+}
+
+/// Assinatura eletrônica simples (Lei 14.063/2020): identifica quem, quando, de onde e o hash do documento.
+model Assinatura {
+  id            String    @id @default(cuid())
+  documentoId   String
+  documento     Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  usuarioId     String
+  usuario       Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  nome          String
+  papel         Papel
+  assinadoEm    DateTime  @default(now())
+  ip            String?
+  userAgent     String?
+  hashDocumento String
+
+  @@unique([documentoId, usuarioId])
+}
+
+// ---------------------------------------------------------------------------
+// Financeiro e comercial do consultor
+// ---------------------------------------------------------------------------
+
+model Mensalidade {
+  id                String         @id @default(cuid())
+  clienteId         String
+  cliente           Cliente        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  ano               Int
+  mes               Int
+  valor             Decimal        @db.Decimal(12, 2)
+  vencimento        DateTime       @db.Date
+  status            StatusCobranca @default(ABERTO)
+  pagoEm            DateTime?      @db.Date
+  formaPagamento    String?
+  txid              String?
+  lembreteEnviadoEm DateTime?
+  observacoes       String?
+  criadoEm          DateTime       @default(now())
+
+  @@unique([clienteId, ano, mes])
+  @@index([status, vencimento])
+}
+
+model ServicoAvulso {
+  id             String         @id @default(cuid())
+  clienteId      String
+  cliente        Cliente        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  /// REGULARIZACAO, RESCISAO, ADMISSAO, OUTRO
+  tipo           String
+  descricao      String
+  valor          Decimal        @db.Decimal(12, 2)
+  data           DateTime       @db.Date
+  status         StatusCobranca @default(ABERTO)
+  pagoEm         DateTime?      @db.Date
+  formaPagamento String?
+  criadoEm       DateTime       @default(now())
+
+  @@index([clienteId])
+}
+
+model Lead {
+  id             String     @id @default(cuid())
+  nome           String
+  telefone       String?
+  email          String?
+  cidade         String?
+  qtdEmpregados  Int        @default(1)
+  servicos       Json?
+  origem         String?
+  status         StatusLead @default(NOVO)
+  valorProposta  Decimal?   @db.Decimal(12, 2)
+  propostaEm     DateTime?
+  proximoContato DateTime?  @db.Date
+  observacoes    String?
+  criadoEm       DateTime   @default(now())
+  atualizadoEm   DateTime   @updatedAt
+}
+
+model RegistroTempo {
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  usuarioId String?
+  tarefa    String
+  minutos   Int
+  data      DateTime @db.Date
+  criadoEm  DateTime @default(now())
+
+  @@index([clienteId, data])
+}
+
+// ---------------------------------------------------------------------------
+// Atendimento
+// ---------------------------------------------------------------------------
+
+model Mensagem {
+  id        String    @id @default(cuid())
+  clienteId String
+  cliente   Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  autorId   String
+  autor     Usuario   @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  texto     String
+  criadoEm  DateTime  @default(now())
+  lidaEm    DateTime?
+
+  @@index([clienteId, criadoEm])
+}
+
+model RespostaPronta {
+  id        String @id @default(cuid())
+  titulo    String
+  texto     String
+  categoria String @default("Geral")
+}
+
+model Artigo {
+  id           String   @id @default(cuid())
+  titulo       String
+  categoria    String
+  conteudo     String
+  publico      Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}

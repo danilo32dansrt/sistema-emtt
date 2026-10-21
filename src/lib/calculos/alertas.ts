@@ -137,7 +137,7 @@ export function gerarAgenda(opcoes: {
     if (!c.procuracaoValidade) continue;
     const v = soData(c.procuracaoValidade);
     add({ chave: `proc-aviso-${c.id}`, data: addDias(v, -30), tipo: "PROCURACAO", titulo: `Procuração vence em 30 dias — ${c.nome}`, descricao: `A procuração eletrônica vence em ${formatarData(v)}. Peça a renovação.`, severidade: severidadePorPrazo(hoje, v, 0, 30), clienteId: c.id });
-    add({ chave: `proc-${c.id}`, data: v, tipo: "PROCURACAO", titulo: `Procuração vence hoje — ${c.nome}`, descricao: "Sem procuração ativa não é possível acessar o eSocial do cliente.", severidade: severidadePorPrazo(hoje, v, 0, 30), clienteId: c.id });
+    add({ chave: `proc-${c.id}`, data: v, tipo: "PROCURACAO", titulo: `Vencimento da procuração — ${c.nome}`, descricao: "Sem procuração ativa não é possível acessar o eSocial do cliente.", severidade: severidadePorPrazo(hoje, v, 0, 30), clienteId: c.id });
   }
 
   for (const e of empregados.filter((x) => x.ativo)) {

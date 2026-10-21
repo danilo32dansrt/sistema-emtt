@@ -36,10 +36,18 @@ describe("caso real — fevereiro/2026 (parcial 22h, admissão 09/02/2026)", () 
     expect(e.totalDae).toBe(159.2);
   });
 
-  it("mês cheio (março/2026) gera DAE sobre o salário integral", () => {
+  it("mês cheio (março/2026): INSS R$ 60,78 e líquido R$ 749,72", () => {
     const f = calcularFolhaMensal({ ano: 2026, mes: 3, salario: 810.5, horasSemanais: 22, admissao: data(2026, 2, 9), tabela: t });
     expect(f.proventos[0].valor).toBe(810.5);
-    // 7,5% = 60,7875 → 60,78; 8% = 64,84; 0,8% = 6,484 → 6,48; 8% = 64,84; 3,2% = 25,936 → 25,93
-    expect(f.encargos.totalDae).toBe(222.87);
+    expect(f.encargos.inssEmpregado).toBe(60.78);
+    expect(f.liquido).toBe(749.72);
   });
+
+  /**
+   * PENDENTE DE CONFIRMAÇÃO: o eSocial gerou DAE de R$ 222,89 no mês cheio, mas truncando
+   * cada parcela (regra que reproduz exatamente os R$ 159,18 de fevereiro) o total dá R$ 222,87.
+   * Nenhuma regra única de arredondamento reproduz os dois valores; precisamos da guia
+   * discriminada (INSS, GILRAT, FGTS, FGTS compensatório) do mês cheio para ajustar.
+   */
+  it.todo("mês cheio: DAE de R$ 222,89 (sistema calcula R$ 222,87 — aguardando guia discriminada)");
 });

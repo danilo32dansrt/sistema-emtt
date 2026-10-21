@@ -20,9 +20,18 @@ export function vencimentoDaeDecimo(ano: number): Date {
  * (Lei 9.430/1996, art. 61) e juros pela taxa Selic acumulada a partir do mês
  * seguinte ao vencimento, mais 1% no mês do pagamento.
  */
-export function acrescimosAtraso(principal: number, vencimento: Date, pagamento: Date, selicMensal: number) {
+export function acrescimosAtraso(
+  principal: number,
+  vencimento: Date,
+  pagamento: Date,
+  selicMensal: number,
+  regras: { multaDiaria?: number; multaMaxima?: number; jurosMesPagamento?: number } = {},
+) {
+  const multaDiaria = regras.multaDiaria ?? 0.33;
+  const multaMaxima = regras.multaMaxima ?? 20;
+  const jurosMesPagamento = regras.jurosMesPagamento ?? 1;
   const dias = Math.max(0, diferencaDias(vencimento, pagamento));
-  const percMulta = Math.min(20, arred(dias * 0.33, 2));
+  const percMulta = Math.min(multaMaxima, arred(dias * multaDiaria, 2));
   const multa = arred((principal * percMulta) / 100);
   let meses = 0;
   if (dias > 0) {
@@ -31,7 +40,7 @@ export function acrescimosAtraso(principal: number, vencimento: Date, pagamento:
     meses = (p.getUTCFullYear() - v.getUTCFullYear()) * 12 + (p.getUTCMonth() - v.getUTCMonth());
   }
   // Selic acumulada dos meses entre vencimento e pagamento (exclusive) + 1% no mês do pagamento
-  const percJuros = dias > 0 ? arred(Math.max(0, meses - 1) * selicMensal + 1, 4) : 0;
+  const percJuros = dias > 0 ? arred(Math.max(0, meses - 1) * selicMensal + jurosMesPagamento, 4) : 0;
   const juros = arred((principal * percJuros) / 100);
   return { dias, percMulta, multa, meses, percJuros, juros, total: somar(principal, multa, juros) };
 }
@@ -47,12 +56,14 @@ export interface EntradaRegularizacao {
   competencias: CompetenciaAtrasada[];
   dataPagamento: Date;
   tabelas: TabelaAnual[] | Record<number, TabelaAnual>;
-  /** Estimativa da Selic mensal em % (ex.: 1.0). Confira a taxa oficial na Receita Federal. */
+  /** Estimativa da Selic mensal em % (ex.: 1.0). Se omitida, usa o parâmetro da tabela. */
   selicMensal?: number;
+  /** Regras de multa/juros vigentes na data do pagamento (da tabela de parâmetros). */
+  dae?: TabelaAnual["dae"];
 }
 
 export function calcularRegularizacao(e: EntradaRegularizacao) {
-  const selic = e.selicMensal ?? 1.0;
+  const selic = e.selicMensal ?? e.dae?.selicMensal ?? 1.0;
   const memoria = new Memoria();
   const avisos: string[] = [];
   const linhas = e.competencias
@@ -63,7 +74,7 @@ export function calcularRegularizacao(e: EntradaRegularizacao) {
       if (aproximada) avisos.push(`Sem tabela de ${c.ano}; usada a de ${tabela.ano}.`);
       const enc = calcularEncargosMensais({ baseInss: c.remuneracao, tabela });
       const venc = vencimentoDae(c.ano, c.mes);
-      const acr = acrescimosAtraso(enc.totalDae, venc, e.dataPagamento, selic);
+      const acr = acrescimosAtraso(enc.totalDae, venc, e.dataPagamento, selic, e.dae ?? {});
       memoria.add(
         `${formatarCompetencia(c.ano, c.mes)}: DAE ${formatarMoeda(enc.totalDae)}`,
         acr.total,

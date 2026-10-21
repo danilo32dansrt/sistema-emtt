@@ -1,5 +1,6 @@
 export * from "./alertas";
 export * from "./beneficios";
+export * from "./beneficios-sociais";
 export * from "./checklist";
 export * from "./datas";
 export * from "./decimo-terceiro";
@@ -11,6 +12,8 @@ export * from "./ferias";
 export * from "./folha";
 export * from "./inss";
 export * from "./memoria";
+export * from "./parametros";
+export * from "./parametros-padrao";
 export * from "./ponto";
 export * from "./regularizacao";
 export * from "./rescisao";

@@ -8,6 +8,7 @@ import { num } from "@/lib/conversao";
 import { agendaDoBanco } from "@/lib/servicos/agenda";
 import { competenciaPadrao } from "@/lib/servicos/competencia";
 import { validacoesDoEmpregado } from "@/lib/servicos/empregado";
+import { situacaoParametros } from "@/lib/servicos/parametros";
 
 export const metadata = { title: "Painel" };
 
@@ -78,6 +79,9 @@ export default async function Painel() {
   const disciplinares = await prisma.ocorrenciaDisciplinar.findMany({ where: { OR: [{ status: "EM_ANALISE_CONSULTOR" }, { gravidade: "gravissima", status: { in: ["REGISTRADA", "AGUARDANDO_DEFESA"] } }] }, include: { empregado: { select: { nome: true } }, cliente: { select: { nome: true } } } });
   for (const o of disciplinares) {
     pendencias.push({ prioridade: 1, texto: `${o.status === "EM_ANALISE_CONSULTOR" ? "Revisar dossiê de justa causa" : "Ocorrência gravíssima registrada"} — ${o.empregado.nome} (${o.cliente.nome})`, href: `/consultor/disciplinar/${o.id}` });
+  }
+  for (const p of (await situacaoParametros(hoje)).filter((x) => x.pendente || x.fonteMudou || !x.vigente)) {
+    pendencias.push({ prioridade: hoje.getUTCMonth() === 0 && hoje.getUTCDate() <= 15 ? 1 : 2, texto: `Conferir parâmetro legal: ${p.def.rotulo}`, detalhe: p.fonteMudou ? "A página oficial mudou desde a última conferência." : p.vigente?.ultimaConferencia ? `Última conferência em ${formatarData(p.vigente.ultimaConferencia)}.` : "Nunca conferido na fonte oficial.", href: "/consultor/parametros" });
   }
   if (ajustesPendentes) pendencias.push({ prioridade: 2, texto: `${ajustesPendentes} ajuste(s) de ponto aguardando o empregador`, href: "/consultor/ponto" });
 

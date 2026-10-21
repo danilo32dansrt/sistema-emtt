@@ -3,13 +3,15 @@ import { addDias, diasNoMes, data, diferencaDias, formatarData, hojeBrasil } fro
 import { prisma } from "@/lib/db";
 import { enviarEmail } from "@/lib/email";
 import { agendaDoBanco } from "@/lib/servicos/agenda";
+import { situacaoParametros, verificarFontesOficiais } from "@/lib/servicos/parametros";
 
 /**
  * Rotina diária (Vercel Cron, ver vercel.json):
  * - marca procurações vencidas;
  * - gera as mensalidades do mês no dia 1º;
  * - envia por e-mail os lembretes dos próximos 7 dias ao consultor e a cada cliente;
- * - lembra o cliente da mensalidade que vai vencer.
+ * - lembra o cliente da mensalidade que vai vencer;
+ * - verifica as páginas oficiais dos parâmetros e avisa o consultor quando há algo a conferir.
  */
 export async function GET(req: NextRequest) {
   const segredo = process.env.CRON_SECRET;
@@ -63,6 +65,22 @@ export async function GET(req: NextRequest) {
     }
   }
   relatorio.lembretesMensalidade = lembretes;
+
+  // Parâmetros legais: verificação das páginas oficiais (segundas-feiras) e alerta de conferência
+  // todo 2 de janeiro e, semanalmente, enquanto houver parâmetro com mais de 6 meses sem conferência.
+  if (hoje.getUTCDay() === 1) {
+    const v = await verificarFontesOficiais();
+    relatorio.fontesVerificadas = v.verificadas;
+    relatorio.fontesMudaram = v.mudaram;
+  }
+  const pendentes = (await situacaoParametros(hoje)).filter((p) => p.pendente || p.fonteMudou || !p.vigente);
+  const doisDeJaneiro = hoje.getUTCMonth() === 0 && hoje.getUTCDate() === 2;
+  if (doisDeJaneiro || (pendentes.length && hoje.getUTCDay() === 1)) {
+    for (const c of await prisma.usuario.findMany({ where: { papel: "CONSULTOR", ativo: true } })) {
+      await enviarEmail(c.email, doisDeJaneiro ? "Início do ano: confira os parâmetros legais" : `${pendentes.length} parâmetro(s) legal(is) para conferir`, `<p>${doisDeJaneiro ? "Novo ano: confira salário mínimo, INSS, salário-família, Bolsa Família e BPC antes de fechar a folha de janeiro." : "Os parâmetros abaixo precisam ser conferidos na fonte oficial:"}</p><ul>${pendentes.map((p) => `<li>${p.def.rotulo}${p.fonteMudou ? " (a página oficial mudou)" : ""}</li>`).join("")}</ul><p><a href="${app}/consultor/parametros">Abrir os parâmetros legais</a></p>`);
+    }
+  }
+  relatorio.parametrosParaConferir = pendentes.length;
   relatorio.emailsEnviados = enviados;
   relatorio.eventosSemana = eventos.length;
   return NextResponse.json({ ok: true, data: formatarData(hoje), ...relatorio });

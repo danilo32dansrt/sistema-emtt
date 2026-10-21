@@ -36,7 +36,7 @@ export async function propsCalculadora(clienteId?: string) {
     tabelas,
     empregados: lista,
     regraFeriasParcial: (cfg.regraFeriasParcial === "LC150" ? "LC150" : "CLT") as "CLT" | "LC150",
-    selicMensal: num(cfg.selicMensal),
+    selicMensal: (await todasTabelas()).at(-1)?.dae?.selicMensal ?? 1,
     hoje: isoData(hojeBrasil()),
   };
 }

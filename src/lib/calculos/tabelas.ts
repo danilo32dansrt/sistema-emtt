@@ -27,6 +27,8 @@ export interface TabelaAnual {
   aliquotas: AliquotasEmpregador;
   /** O eSocial trunca as parcelas do DAE; deixamos configurável. */
   arredondamentoDae: ModoArredondamento;
+  /** Multa e juros do DAE em atraso (se omitido, usa 0,33%/dia até 20%, Selic 1% e 1% no mês do pagamento). */
+  dae?: { multaDiaria: number; multaMaxima: number; selicMensal: number; jurosMesPagamento: number };
 }
 
 export const ALIQUOTAS_PADRAO: AliquotasEmpregador = {

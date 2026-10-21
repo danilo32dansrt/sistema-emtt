@@ -10,7 +10,7 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { TABELAS_PADRAO, addDias, data, diaSemana, ehFeriado, hojeBrasil, instanteLocal } from "../src/lib/calculos";
+import { PARAMETROS_PADRAO, addDias, definicao, data, diaSemana, ehFeriado, hojeBrasil, instanteLocal } from "../src/lib/calculos";
 import { MODELOS_PADRAO } from "../src/lib/whatsapp";
 import { hashMarcacao } from "../src/lib/ponto/hash";
 
@@ -18,17 +18,14 @@ const prisma = new PrismaClient();
 const somenteTabelas = process.argv.includes("--somente-tabelas");
 
 async function tabelas() {
-  for (const t of Object.values(TABELAS_PADRAO)) {
-    const dados = {
-      salarioMinimo: t.salarioMinimo,
-      faixasInss: t.faixasInss as unknown as Prisma.InputJsonValue,
-      salarioFamiliaLimite: t.salarioFamiliaLimite,
-      salarioFamiliaCota: t.salarioFamiliaCota,
-      ...t.aliquotas,
-      arredondamentoDae: t.arredondamentoDae,
-      observacoes: "Valores padrão da carga inicial — confira com as portarias oficiais do ano.",
-    };
-    await prisma.tabelaAnual.upsert({ where: { ano: t.ano }, create: { ano: t.ano, ...dados }, update: {} });
+  // Parâmetros legais com vigência: só cria o que ainda não existe (nunca sobrescreve valores editados).
+  // Ficam sem data de conferência, para o sistema pedir que o consultor confira na fonte oficial.
+  for (const p of PARAMETROS_PADRAO) {
+    await prisma.parametro.upsert({
+      where: { chave_vigenciaInicio: { chave: p.chave, vigenciaInicio: p.vigenciaInicio } },
+      create: { chave: p.chave, vigenciaInicio: p.vigenciaInicio, valor: p.valor as Prisma.InputJsonValue, fonteUrl: definicao(p.chave)?.fonte, observacao: p.observacao ?? "Valor da carga inicial — confira na fonte oficial." },
+      update: {},
+    });
   }
   await prisma.configuracao.upsert({ where: { id: "principal" }, create: { id: "principal", nomeConsultoria: "Consultoria eSocial Doméstico", cidade: "São Paulo", uf: "SP" }, update: {} });
   for (const m of MODELOS_PADRAO) await prisma.modeloMensagem.upsert({ where: { chave: m.chave }, create: m, update: {} });

@@ -2,11 +2,12 @@ import "server-only";
 import type { Empregado, LancamentoMensal } from "@prisma/client";
 import { calcularFolhaMensal } from "@/lib/calculos";
 import { num } from "@/lib/conversao";
-import { tabelaDoAno } from "@/lib/tabelas-db";
+import { tabelaNaDataDb } from "@/lib/tabelas-db";
+import { data } from "@/lib/calculos";
 
 /** Folha estimada do mês a partir do cadastro e das informações enviadas (cliente ou ponto). */
 export async function folhaDoMes(e: Empregado, ano: number, mes: number, l?: LancamentoMensal | null) {
-  const { tabela, aproximada } = await tabelaDoAno(ano);
+  const { tabela, aproximada } = await tabelaNaDataDb(data(ano, mes, 1));
   const folha = calcularFolhaMensal({
     ano,
     mes,

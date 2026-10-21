@@ -272,7 +272,7 @@ function AbaRegularizacao({ base, tabelas, hoje, selic }: { base: Base; tabelas:
   const ini = d(f.inicio);
   const fim = d(f.fim);
   const pag = d(f.pagamento);
-  const r = ini && fim && pag && ini <= fim ? calcularRegularizacao({ competencias: competenciasEntre(ini, fim, n(f.remuneracao)), dataPagamento: pag, tabelas, selicMensal: n(f.selic) }) : null;
+  const r = ini && fim && pag && ini <= fim ? calcularRegularizacao({ competencias: competenciasEntre(ini, fim, n(f.remuneracao)), dataPagamento: pag, tabelas, selicMensal: n(f.selic), dae: escolherTabela(tabelas, pag.getUTCFullYear()).tabela.dae }) : null;
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-5">

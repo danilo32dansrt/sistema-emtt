@@ -1,27 +1,10 @@
-import type { Empregado, Prisma, TabelaAnual as TabelaDb } from "@prisma/client";
-import type { ConfigJornada, DiaSemana, FaixaInss, JornadaSemanal, TabelaAnual } from "./calculos";
+import type { Empregado, Prisma } from "@prisma/client";
+import type { ConfigJornada, DiaSemana, JornadaSemanal } from "./calculos";
 
 /** Converte Decimal do Prisma (ou null) para number. */
 export function num(v: Prisma.Decimal | number | string | null | undefined): number {
   if (v === null || v === undefined) return 0;
   return typeof v === "number" ? v : Number(v);
-}
-
-export function tabelaDoBanco(t: TabelaDb): TabelaAnual {
-  return {
-    ano: t.ano,
-    salarioMinimo: num(t.salarioMinimo),
-    faixasInss: (t.faixasInss as unknown as FaixaInss[]).map((f) => ({ ate: Number(f.ate), aliquota: Number(f.aliquota) })),
-    salarioFamiliaLimite: num(t.salarioFamiliaLimite),
-    salarioFamiliaCota: num(t.salarioFamiliaCota),
-    aliquotas: {
-      inssPatronal: num(t.inssPatronal),
-      gilrat: num(t.gilrat),
-      fgts: num(t.fgts),
-      fgtsCompensatorio: num(t.fgtsCompensatorio),
-    },
-    arredondamentoDae: t.arredondamentoDae === "arredondar" ? "arredondar" : "truncar",
-  };
 }
 
 export function jornadaDoEmpregado(e: Pick<Empregado, "jornada">): JornadaSemanal {

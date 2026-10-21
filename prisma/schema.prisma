@@ -142,28 +142,38 @@ model Configuracao {
   cidadePix            String?
   /// "CLT" (30 dias) ou "LC150" (tabela do art. 3º, § 3º) para férias do tempo parcial
   regraFeriasParcial   String  @default("CLT")
-  selicMensal          Decimal @default(1.0) @db.Decimal(6, 4)
   diaLimiteInfo        Int     @default(30)
   diaEmissaoGuias      Int     @default(4)
   /// Meses em que uma medida disciplinar antiga ainda pesa integralmente na recomendação
   mesesPesoDisciplinar Int     @default(12)
 }
 
-/// Salário mínimo, INSS e salário-família por ano — editáveis sem mexer no código.
-model TabelaAnual {
-  ano                  Int      @id
-  salarioMinimo        Decimal  @db.Decimal(12, 2)
-  /// [{ "ate": 1621.00, "aliquota": 7.5 }, ...]
-  faixasInss           Json
-  salarioFamiliaLimite Decimal  @db.Decimal(12, 2)
-  salarioFamiliaCota   Decimal  @db.Decimal(12, 2)
-  inssPatronal         Decimal  @default(8) @db.Decimal(5, 2)
-  gilrat               Decimal  @default(0.8) @db.Decimal(5, 2)
-  fgts                 Decimal  @default(8) @db.Decimal(5, 2)
-  fgtsCompensatorio    Decimal  @default(3.2) @db.Decimal(5, 2)
-  arredondamentoDae    String   @default("truncar")
-  observacoes          String?
-  atualizadoEm         DateTime @updatedAt
+/// Tabela única de parâmetros legais com data de vigência (histórico: uma linha por vigência).
+model Parametro {
+  id                String    @id @default(cuid())
+  chave             String
+  /// Número, texto ou faixas (JSON)
+  valor             Json
+  vigenciaInicio    DateTime  @db.Date
+  fonteUrl          String?
+  ultimaConferencia DateTime? @db.Date
+  observacao        String?
+  criadoPorId       String?
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
+
+  @@unique([chave, vigenciaInicio])
+  @@index([chave])
+}
+
+/// Páginas oficiais monitoradas (aviso de possível mudança; a atualização é sempre confirmada pelo consultor).
+model FonteOficial {
+  id           String    @id @default(cuid())
+  url          String    @unique
+  hash         String?
+  verificadaEm DateTime?
+  mudouEm      DateTime?
+  erro         String?
 }
 
 model TabelaPreco {

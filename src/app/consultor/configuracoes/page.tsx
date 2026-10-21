@@ -32,7 +32,6 @@ export default async function Configuracoes() {
             </Grade>
             <Grade>
               <Selecao rotulo="Férias no tempo parcial" name="regraFeriasParcial" defaultValue={cfg.regraFeriasParcial} opcoes={[{ valor: "CLT", rotulo: "30 dias (CLT após a Reforma — mais seguro)" }, { valor: "LC150", rotulo: "Tabela da LC 150, art. 3º, § 3º (8 a 18 dias)" }]} ajuda="Ponto controverso: confirme com o seu advogado trabalhista." />
-              <Campo rotulo="Selic mensal estimada (%)" name="selicMensal" inputMode="decimal" defaultValue={String(num(cfg.selicMensal)).replace(".", ",")} ajuda="Usada na estimativa de juros da regularização." />
             </Grade>
           </Formulario>
         </Cartao>

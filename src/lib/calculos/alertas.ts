@@ -127,8 +127,8 @@ export function gerarAgenda(opcoes: {
       chave: `reajuste-${ano}`,
       data: data(ano, 1, 2),
       tipo: "REAJUSTE_ANUAL",
-      titulo: `Reajuste do salário mínimo ${ano}`,
-      descricao: "Atualize a tabela anual (salário mínimo, INSS e salário-família) e revise salários abaixo do mínimo proporcional.",
+      titulo: `Conferir os parâmetros legais de ${ano}`,
+      descricao: "Confira e atualize os parâmetros legais (salário mínimo, INSS, salário-família, Bolsa Família, BPC) e revise salários abaixo do mínimo proporcional.",
       severidade: "aviso",
     });
   }

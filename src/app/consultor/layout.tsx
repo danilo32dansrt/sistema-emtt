@@ -1,14 +1,16 @@
 import { Casca } from "@/components/Casca";
 import { exigirConsultor } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
+import { quantidadeParametrosPendentes } from "@/lib/servicos/parametros";
 
 export default async function LayoutConsultor({ children }: { children: React.ReactNode }) {
   const u = await exigirConsultor();
-  const [ajustes, justificativas, mensagens, disciplinar] = await Promise.all([
+  const [ajustes, justificativas, mensagens, disciplinar, parametrosPendentes] = await Promise.all([
     prisma.ajustePonto.count({ where: { status: "PENDENTE" } }),
     prisma.justificativa.count({ where: { status: "PENDENTE" } }),
     prisma.mensagem.count({ where: { lidaEm: null, autor: { papel: "CLIENTE" } } }),
     prisma.ocorrenciaDisciplinar.count({ where: { status: "EM_ANALISE_CONSULTOR" } }),
+    quantidadeParametrosPendentes(),
   ]);
   return (
     <Casca
@@ -31,7 +33,7 @@ export default async function LayoutConsultor({ children }: { children: React.Re
         { href: "/consultor/conhecimento", rotulo: "Base de conhecimento", icone: "📚" },
         { href: "/consultor/produtividade", rotulo: "Produtividade", icone: "⏳" },
         { href: "/consultor/atividades", rotulo: "Registro de atividades", icone: "🗂️" },
-        { href: "/consultor/tabelas", rotulo: "Tabelas anuais", icone: "📋" },
+        { href: "/consultor/parametros", rotulo: "Parâmetros legais", icone: "📋", contador: parametrosPendentes },
         { href: "/consultor/configuracoes", rotulo: "Configurações", icone: "⚙️" },
         { href: "/consultor/lgpd", rotulo: "LGPD e backup", icone: "🔒" },
       ]}

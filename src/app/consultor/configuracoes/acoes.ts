@@ -16,7 +16,6 @@ export async function salvarConfiguracao(_: EstadoAcao, fd: FormData): Promise<E
       documento: textoOpcional, telefone: textoOpcional, email: textoOpcional, endereco: textoOpcional, cidade: textoOpcional, uf: textoOpcional,
       chavePix: textoOpcional, nomePix: textoOpcional, cidadePix: textoOpcional,
       regraFeriasParcial: z.enum(["CLT", "LC150"]),
-      selicMensal: moeda("Selic"),
     }).parse(dadosDoForm(fd));
     await prisma.configuracao.upsert({ where: { id: "principal" }, create: { id: "principal", ...d }, update: d });
     await registrarAtividade({ usuarioId: u.id, acao: "CONFIGURACAO", descricao: "Configurações da consultoria alteradas" });

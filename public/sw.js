@@ -1,6 +1,6 @@
 /* Service worker do aplicativo de ponto: permite abrir o app sem internet.
    As marcações offline ficam guardadas no aparelho e são enviadas pelo app quando a conexão volta. */
-const VERSAO = "ponto-v1";
+const VERSAO = "ponto-v2";
 const ESSENCIAIS = ["/ponto", "/ponto/historico", "/ponto/justificativas", "/manifest.webmanifest", "/icone.svg"];
 
 self.addEventListener("install", (evento) => {
@@ -46,4 +46,39 @@ self.addEventListener("fetch", (evento) => {
         .catch(() => caches.match(req).then((r) => r || caches.match("/ponto"))),
     );
   }
+});
+
+/* Notificações no celular (lembretes do ponto, DAE, pedidos de ajuste) */
+self.addEventListener("push", (evento) => {
+  let dados = {};
+  try {
+    dados = evento.data ? evento.data.json() : {};
+  } catch {
+    dados = { titulo: "Aviso", texto: evento.data ? evento.data.text() : "" };
+  }
+  evento.waitUntil(
+    self.registration.showNotification(dados.titulo || "Aviso", {
+      body: dados.texto || "",
+      icon: "/icone.svg",
+      badge: "/icone.svg",
+      tag: dados.tag,
+      data: { link: dados.link || "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (evento) => {
+  evento.notification.close();
+  const link = (evento.notification.data && evento.notification.data.link) || "/";
+  evento.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+      for (const j of janelas) {
+        if ("focus" in j) {
+          j.navigate(link).catch(() => undefined);
+          return j.focus();
+        }
+      }
+      return self.clients.openWindow(link);
+    }),
+  );
 });

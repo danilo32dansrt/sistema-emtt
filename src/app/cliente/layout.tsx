@@ -2,12 +2,15 @@ import { Casca } from "@/components/Casca";
 import { exigirCliente } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
 
+export const metadata = { manifest: "/manifest-cliente.webmanifest", appleWebApp: { capable: true, title: "Empregador", statusBarStyle: "default" as const } };
+
 export default async function LayoutCliente({ children }: { children: React.ReactNode }) {
   const u = await exigirCliente();
-  const [assinar, ponto, mensagens] = await Promise.all([
+  const [assinar, ponto, mensagens, avisos] = await Promise.all([
     prisma.documento.count({ where: { clienteId: u.clienteId, exigeAssinaturaCliente: true, visivelCliente: true, assinaturas: { none: { papel: "CLIENTE" } } } }),
     prisma.ajustePonto.count({ where: { status: "PENDENTE", empregado: { clienteId: u.clienteId } } }).then(async (n) => n + (await prisma.justificativa.count({ where: { status: "PENDENTE", empregado: { clienteId: u.clienteId } } }))),
     prisma.mensagem.count({ where: { clienteId: u.clienteId, lidaEm: null, autor: { papel: "CONSULTOR" } } }),
+    prisma.notificacao.count({ where: { usuarioId: u.id, lidaEm: null } }),
   ]);
   return (
     <Casca
@@ -15,6 +18,7 @@ export default async function LayoutCliente({ children }: { children: React.Reac
       usuario={u.nome}
       itens={[
         { href: "/cliente", rotulo: "Início", icone: "🏠" },
+        { href: "/cliente/avisos", rotulo: "Avisos", icone: "🔔", contador: avisos },
         { href: "/cliente/informar", rotulo: "Informar o mês", icone: "✍️" },
         { href: "/cliente/dae", rotulo: "DAE e pagamentos", icone: "🧾" },
         { href: "/cliente/documentos", rotulo: "Documentos", icone: "📄", contador: assinar },

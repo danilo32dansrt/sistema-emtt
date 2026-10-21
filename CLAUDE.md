@@ -96,6 +96,10 @@ valores em reais com 2 casas e datas dd/mm/aaaa.
   menos é descontada ou abonada; hora a mais paga com 50% (parcial: até 1h/dia e 6h no dia). Ausências têm tratamento
   ABONAR / COMPENSAR / DESCONTAR. Limites na tabela de parâmetros (grupo "Jornada e banco de horas").
 - Fluxo: empregado marca (selfie + localização, offline com horário real); sistema calcula diariamente; empregador aprova ou pede ajuste (nunca apaga); espelho no fim do mês assinado pelos dois; consultor recebe o resumo em reais por rubrica.
+- **Avisos no celular:** patrão e empregada usam PWA instalável (manifestos `/manifest-cliente.webmanifest` e
+  `/manifest.webmanifest`); consultor só web. Web Push (VAPID no `.env`), tabelas `Notificacao` (chave única = não repete)
+  e `InscricaoPush`; regras puras em `calculos/lembretes.ts`; rotina `/api/cron/lembretes` a cada 10 min (agendador externo)
+  e lembretes de DAE/pedidos no cron diário; avisos imediatos em pedidos de ajuste/justificativa e nas decisões.
 - eSocial: versão inicial gera o resumo de rubricas para lançamento manual; webservice direto é estudo futuro.
 
 ### 4.2 Ferramentas extras

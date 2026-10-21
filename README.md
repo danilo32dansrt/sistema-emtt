@@ -105,6 +105,22 @@ cliente paga (o sistema confirma consultando o banco antes de dar baixa) e, por 
 novo as cobranças pendentes. O cliente precisa ter **CPF/CNPJ, endereço, cidade, UF e CEP** no cadastro. Ao dar baixa
 manual (pagamento por outro meio), o sistema cancela a cobrança no Inter para evitar pagamento em dobro.
 
+## Avisos no celular (patrão e empregada)
+
+Patrão e empregada usam o sistema como **aplicativo no celular** (instalável pelo navegador; o consultor usa só a web).
+O sistema avisa: hora de bater o ponto, de sair e voltar do intervalo, de marcar a saída; dia sem marcação ou incompleto
+(para os dois); pedidos de ajuste e justificativas (para o patrão) e a resposta (para a empregada); DAE a vencer, vencendo
+e atrasado. Tudo fica também na tela **Avisos** de cada um.
+
+1. Gere as chaves: `npx web-push generate-vapid-keys` e coloque `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_ASSUNTO`
+   no `.env` e na Vercel.
+2. Os lembretes do ponto precisam rodar **a cada 10 minutos**. No plano gratuito da Vercel o agendamento só roda 1 vez por
+   dia; use um agendador gratuito como o **cron-job.org**: crie uma tarefa a cada 10 minutos chamando
+   `https://SEU-ENDERECO/api/cron/lembretes` com o cabeçalho `Authorization: Bearer <CRON_SECRET>`.
+3. No celular: **Android** — abra o sistema no Chrome, toque em **Ativar avisos no celular** (e, se quiser, "Instalar app").
+   **iPhone** (iOS 16.4 ou mais novo) — no Safari toque em Compartilhar → **Adicionar à Tela de Início**, abra pelo ícone e
+   ative os avisos (a Apple só permite avisos com o app instalado).
+
 ---
 
 ## Antes de vender o sistema

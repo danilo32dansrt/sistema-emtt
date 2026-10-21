@@ -21,3 +21,4 @@ export * from "./salario";
 export * from "./simuladores";
 export * from "./tabelas";
 export * from "./validacoes";
+export * from "./lembretes";

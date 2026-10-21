@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { AtivarAvisos } from "@/components/AtivarAvisos";
 import { ListaAgenda } from "@/components/ListaAgenda";
 import { Aviso, Cartao, LinkBotao, Selo, Titulo } from "@/components/ui";
 import { exigirCliente } from "@/lib/auth/sessao";
 import { addDias, formatarCompetencia, formatarData, formatarMoeda, hojeBrasil, provisaoMensal } from "@/lib/calculos";
 import { num } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
+import { chavePublicaPush } from "@/lib/notificacoes";
 import { agendaDoBanco } from "@/lib/servicos/agenda";
 import { competenciaPadrao } from "@/lib/servicos/competencia";
 import { tabelaDoAno } from "@/lib/tabelas-db";
@@ -28,6 +30,7 @@ export default async function InicioCliente() {
     <>
       <Titulo subtitulo={`Competência ${formatarCompetencia(comp.ano, comp.mes)}`}>Olá, {u.nome.split(" ")[0]}!</Titulo>
       <div className="mb-4 space-y-2">
+        <AtivarAvisos chavePublica={chavePublicaPush()} compacto />
         {assinar > 0 && <Aviso tipo="aviso">Você tem {assinar} documento(s) para assinar. <Link className="font-semibold underline" href="/cliente/documentos">Assinar agora</Link></Aviso>}
         {mensalidade && mensalidade.vencimento < hoje && <Aviso tipo="critico">Mensalidade {formatarCompetencia(mensalidade.ano, mensalidade.mes)} vencida em {formatarData(mensalidade.vencimento)}. <Link className="font-semibold underline" href="/cliente/mensalidade">Pagar com Pix</Link></Aviso>}
       </div>

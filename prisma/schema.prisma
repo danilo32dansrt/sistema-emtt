@@ -89,6 +89,8 @@ model Usuario {
   atividades  Atividade[]
   mensagens   Mensagem[]
   assinaturas Assinatura[]
+  inscricoesPush InscricaoPush[]
+  notificacoes   Notificacao[]
 
   @@index([clienteId])
 }
@@ -709,4 +711,38 @@ model OcorrenciaDisciplinar {
   @@index([clienteId, criadoEm])
   @@index([empregadoId, dataFato])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Avisos (notificações no app e no celular)
+// ---------------------------------------------------------------------------
+
+/// Celular/navegador que aceitou receber notificações (Web Push).
+model InscricaoPush {
+  id        String   @id @default(cuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  criadoEm  DateTime @default(now())
+
+  @@index([usuarioId])
+}
+
+/// Aviso para um usuário. A chave evita mandar o mesmo lembrete duas vezes.
+model Notificacao {
+  id        String    @id @default(cuid())
+  usuarioId String
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  chave     String
+  titulo    String
+  texto     String
+  link      String?
+  lidaEm    DateTime?
+  criadaEm  DateTime  @default(now())
+
+  @@unique([usuarioId, chave])
+  @@index([usuarioId, lidaEm])
 }

@@ -1,7 +1,9 @@
+import { AtivarAvisos } from "@/components/AtivarAvisos";
 import { Aviso, Cartao } from "@/components/ui";
 import { exigirEmpregado } from "@/lib/auth/sessao";
 import { addDias, hojeBrasil } from "@/lib/calculos";
 import { prisma } from "@/lib/db";
+import { chavePublicaPush } from "@/lib/notificacoes";
 import { aceitarPrivacidade } from "./acoes";
 import { RelogioPonto } from "./RelogioPonto";
 import { TextoPrivacidade } from "./TextoPrivacidade";
@@ -33,11 +35,14 @@ export default async function PaginaPonto() {
     select: { tipo: true, dataHora: true },
   });
   return (
-    <RelogioPonto
-      nome={emp.nome}
-      exigirSelfie={emp.exigirSelfie}
-      exigirLocalizacao={emp.exigirLocalizacao}
-      marcacoesHoje={marcacoes.map((m) => ({ tipo: m.tipo, dataHora: m.dataHora.toISOString() }))}
-    />
+    <>
+      <RelogioPonto
+        nome={emp.nome}
+        exigirSelfie={emp.exigirSelfie}
+        exigirLocalizacao={emp.exigirLocalizacao}
+        marcacoesHoje={marcacoes.map((m) => ({ tipo: m.tipo, dataHora: m.dataHora.toISOString() }))}
+      />
+      <div className="mt-4"><AtivarAvisos chavePublica={chavePublicaPush()} compacto /></div>
+    </>
   );
 }

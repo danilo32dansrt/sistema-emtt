@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { enviarEmail } from "@/lib/email";
 import { agendaDoBanco } from "@/lib/servicos/agenda";
 import { rotinaCobrancaInter } from "@/lib/servicos/cobranca-inter";
+import { rodarLembretesDiarios } from "@/lib/servicos/lembretes";
 import { situacaoParametros, verificarFontesOficiais } from "@/lib/servicos/parametros";
 
 /**
@@ -12,6 +13,7 @@ import { situacaoParametros, verificarFontesOficiais } from "@/lib/servicos/para
  * - gera as mensalidades do mês no dia 1º;
  * - envia por e-mail os lembretes dos próximos 7 dias ao consultor e a cada cliente;
  * - emite pelo Banco Inter as cobranças das mensalidades e confere as pendentes (baixa automática);
+ * - avisa no celular do patrão o DAE a pagar e os pedidos de ponto esperando resposta;
  * - lembra o cliente da mensalidade que vai vencer;
  * - verifica as páginas oficiais dos parâmetros e avisa o consultor quando há algo a conferir.
  */
@@ -47,6 +49,12 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("Rotina de cobrança Inter falhou", e);
     relatorio.errosInter = -1;
+  }
+
+  try {
+    relatorio.avisosCelular = (await rodarLembretesDiarios(hoje)).enviados;
+  } catch (e) {
+    console.error("Lembretes diários falharam", e);
   }
 
   const eventos = (await agendaDoBanco({ de: hoje, ate: addDias(hoje, 7), hoje })).filter((e) => e.tipo !== "ANIVERSARIO_ADMISSAO");

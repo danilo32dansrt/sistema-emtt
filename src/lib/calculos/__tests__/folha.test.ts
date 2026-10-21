@@ -38,6 +38,16 @@ describe("folha mensal", () => {
     expect(f.liquido).toBe(1069.71);
   });
 
+  it("salário-família: direito pela remuneração do mês inteiro, cota proporcional aos dias", () => {
+    // Admitida em 17/03 com salário de R$ 2.500: o proporcional (R$ 1.209,68) fica abaixo do teto,
+    // mas a remuneração do mês inteiro passa de R$ 1.980,38 — não tem direito
+    const semDireito = calcularFolhaMensal({ ano: 2026, mes: 3, salario: 2500, horasSemanais: 44, admissao: data(2026, 3, 17), tabela: t, dependentesSalarioFamilia: 1 });
+    expect(semDireito.salarioFamilia).toBe(0);
+    // Salário de R$ 1.621 admitida em 17/03: tem direito à cota proporcional (15/31 dias)
+    const comDireito = calcularFolhaMensal({ ano: 2026, mes: 3, salario: 1621, horasSemanais: 44, admissao: data(2026, 3, 17), tabela: t, dependentesSalarioFamilia: 1 });
+    expect(comDireito.salarioFamilia).toBe(32.68);
+  });
+
   it("desligamento no meio do mês", () => {
     const f = calcularFolhaMensal({ ano: 2026, mes: 4, salario: 1621, horasSemanais: 44, admissao: data(2025, 1, 1), desligamento: data(2026, 4, 10), tabela: t });
     expect(f.diasTrabalhados).toBe(10);

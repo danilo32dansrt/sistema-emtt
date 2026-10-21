@@ -21,6 +21,7 @@ export async function pdfBeneficios(r: ResultadoBeneficiosSociais, nome: string,
   );
   doc.paragrafo(r.comCarteira.bolsaFamilia.explicacao, { tamanho: 9 });
   for (const a of r.alertasBpc) doc.paragrafo(`Atenção (BPC): ${a}`, { tamanho: 9 });
+  for (const t of r.notasBolsa) doc.paragrafo(`• ${t}`, { tamanho: 8, espaco: 2 });
   doc.subtitulo("Ganho estimado com a carteira (valores de hoje)");
   doc.campos([
     ["Em 12 meses", `${formatarMoeda(r.ganho12.diferenca)} a mais, além de ${formatarMoeda(r.ganho12.fgts)} guardados no FGTS`],

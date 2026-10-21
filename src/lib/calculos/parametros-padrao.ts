@@ -15,7 +15,6 @@ export const PARAMETROS_PADRAO: (RegistroParametro & { fonte?: string; observaca
       { chave: "INSS_FAIXAS", valor: t.faixasInss, vigenciaInicio: ini },
       { chave: "SALARIO_FAMILIA_LIMITE", valor: t.salarioFamiliaLimite, vigenciaInicio: ini },
       { chave: "SALARIO_FAMILIA_COTA", valor: t.salarioFamiliaCota, vigenciaInicio: ini },
-      { chave: "BF_PROTECAO_LIMITE", valor: t.salarioMinimo / 2, vigenciaInicio: ini, observacao: "Meio salário mínimo (padrão). Confira se houve mudança na regra de proteção." },
     ];
   }),
   { chave: "INSS_PATRONAL", valor: 8, vigenciaInicio: data(2015, 10, 1) },
@@ -33,6 +32,11 @@ export const PARAMETROS_PADRAO: (RegistroParametro & { fonte?: string; observaca
   { chave: "BF_PRIMEIRA_INFANCIA", valor: 150, vigenciaInicio: data(2023, 3, 1) },
   { chave: "BF_VARIAVEL_FAMILIAR", valor: 50, vigenciaInicio: data(2023, 6, 1) },
   { chave: "BF_PROTECAO_PERCENTUAL", valor: 50, vigenciaInicio: data(2023, 3, 1) },
-  { chave: "BF_PROTECAO_MESES", valor: 24, vigenciaInicio: data(2023, 3, 1), observacao: "Confira no gov.br: a duração pode ter sido alterada." },
+  { chave: "BF_PROTECAO_MESES", valor: 24, vigenciaInicio: data(2023, 3, 1), observacao: "Regra original da Lei 14.601/2023." },
+  { chave: "BF_PROTECAO_MESES", valor: 12, vigenciaInicio: data(2025, 6, 1), observacao: "Portaria MDS nº 1.084/2025: 12 meses para quem entra na regra a partir de jun/2025 (quem já estava segue com até 24)." },
+  // Regra de proteção: meio salário mínimo até mai/2025; teto fixo de R$ 706 a partir de jun/2025 (Portaria MDS nº 1.084/2025)
+  { chave: "BF_PROTECAO_LIMITE", valor: 706, vigenciaInicio: data(2024, 1, 1), observacao: "Meio salário mínimo de 2024." },
+  { chave: "BF_PROTECAO_LIMITE", valor: 759, vigenciaInicio: data(2025, 1, 1), observacao: "Meio salário mínimo de 2025." },
+  { chave: "BF_PROTECAO_LIMITE", valor: 706, vigenciaInicio: data(2025, 6, 1), observacao: "Portaria MDS nº 1.084/2025: teto fixo de R$ 706 por pessoa." },
   { chave: "BPC_FRACAO_SM", valor: 0.25, vigenciaInicio: data(1993, 12, 7) },
 ];

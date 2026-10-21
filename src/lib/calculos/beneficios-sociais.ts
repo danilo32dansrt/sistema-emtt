@@ -171,9 +171,16 @@ export function simularBeneficiosSociais(e: EntradaBeneficiosSociais) {
     return { sem: arred(sem), com: arred(com), diferenca: arred(com - sem), fgts: arred(fgtsAno * anos) };
   }
 
+  const notasBolsa = [
+    "Famílias que já estavam na regra de proteção antes de junho de 2025 seguem as condições antigas (até 24 meses).",
+    "Se o aumento de renda vier de aposentadoria, pensão ou BPC, a permanência na regra de proteção é menor. Confirme no CRAS.",
+    "Quem sai do programa por aumento de renda pode voltar com prioridade se a renda cair (retorno garantido).",
+  ];
+
   return {
     semCarteira,
     comCarteira,
+    notasBolsa,
     estimativaBolsa: estimativa,
     valorBolsaUsado: valorBolsa,
     alertasBpc,

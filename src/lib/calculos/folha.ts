@@ -150,7 +150,10 @@ export function calcularFolhaMensal(e: EntradaFolha): ResultadoFolha {
   const baseInss = Math.max(0, somar(somaIncide(proventos, "incideInss"), -somaIncide(descontos, "incideInss")));
   const baseFgts = Math.max(0, somar(somaIncide(proventos, "incideFgts"), -somaIncide(descontos, "incideFgts")));
 
-  const sf = calcularSalarioFamilia(baseInss, e.dependentesSalarioFamilia ?? 0, e.tabela, periodo.mesCompleto ? 1 : periodo.dias / periodo.diasMes);
+  // O direito ao salário-família considera a remuneração do mês inteiro, mesmo em mês de admissão
+  // ou desligamento (Portaria Interministerial MPS/MF nº 13/2026); a cota paga é proporcional aos dias.
+  const remuneracaoMesInteiro = somar(baseInss, -sal.valor, periodo.dias > 0 ? e.salario : 0);
+  const sf = calcularSalarioFamilia(remuneracaoMesInteiro, e.dependentesSalarioFamilia ?? 0, e.tabela, periodo.mesCompleto ? 1 : periodo.dias / periodo.diasMes);
   if (sf.valor > 0) {
     proventos.push({ descricao: "Salário-família", valor: sf.valor, formula: sf.motivo, incideInss: false, incideFgts: false, rubrica: "Salário-família" });
   }

@@ -44,6 +44,8 @@ com três acessos: **Consultor (administrador)**, **Cliente (empregador domésti
 Empregada em tempo parcial de 22h semanais, salário R$ 810,50, admitida em 09/02/2026:
 - Fevereiro/2026: proporcional R$ 578,93, INSS R$ 43,41, líquido R$ 535,52, DAE R$ 159,18 (o eSocial **trunca** cada parcela do DAE).
 - Mês cheio: INSS R$ 60,78, líquido R$ 749,72, DAE R$ 222,89.
+  Salário-família: o direito é verificado pela remuneração do mês inteiro, mesmo em mês de admissão/desligamento
+  (Portaria Interministerial MPS/MF nº 13/2026); a cota paga é proporcional aos dias.
   **Pendência:** truncando, o sistema obtém R$ 222,87 (2 centavos de diferença). Nenhuma regra única de
   arredondamento reproduz os dois DAEs; aguardando a guia discriminada do eSocial (ver `it.todo` em `caso-real.test.ts`).
 
@@ -168,6 +170,10 @@ atualizar o CadÚnico); ganho financeiro total estimado em 12 meses e em 5 anos.
 Regras: linguagem simples, pensada para mostrar no celular à empregada; sempre exibir o aviso
 "Simulação estimada. Confirme no CRAS ou no app Bolsa Família."; gerar PDF/imagem para enviar por WhatsApp;
 nunca sugerir omitir renda ou deixar de atualizar o CadÚnico.
+
+**Regra de proteção atualizada:** a Portaria MDS nº 1.084/2025 mudou a regra a partir de junho/2025 — teto fixo de
+R$ 706 por pessoa (antes, meio salário mínimo) e permanência de 12 meses (antes, até 24; quem já estava na regra segue
+com as condições antigas). Os parâmetros `BF_PROTECAO_LIMITE` e `BF_PROTECAO_MESES` têm as duas vigências.
 
 Implementação: `src/lib/calculos/beneficios-sociais.ts` (regras e testes), `src/components/calc/SimuladorBeneficios.tsx`,
 páginas `/cliente/simuladores/beneficios` e `/consultor/simuladores/beneficios`. No cenário "sem carteira" usa-se a renda

@@ -130,6 +130,9 @@ export function SimuladorBeneficios({ params, tabela, salarioInicial }: { params
       </div>
 
       {r.alertasBpc.map((a) => <Aviso key={a} tipo="aviso" titulo="BPC">{a}</Aviso>)}
+      {r.comCarteira.bolsaFamilia.situacao !== "nao_recebe" && (
+        <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600">{r.notasBolsa.map((t) => <li key={t}>{t}</li>)}</ul>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-emerald-600 p-4 text-white">

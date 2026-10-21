@@ -1,8 +1,8 @@
 import "server-only";
 import type { Empregado } from "@prisma/client";
-import { hojeBrasil, periodosFerias, validarEmpregado, diasDireitoFerias, type RegraFeriasParcial } from "@/lib/calculos";
+import { hojeBrasil, parametrosJornada, periodosFerias, validarEmpregado, diasDireitoFerias, type RegraFeriasParcial } from "@/lib/calculos";
 import { jornadaDoEmpregado, num } from "@/lib/conversao";
-import { tabelaDoAno } from "@/lib/tabelas-db";
+import { registrosParametros, tabelaDoAno } from "@/lib/tabelas-db";
 
 /** Alertas de cadastro do empregado com a tabela do ano corrente. */
 export async function validacoesDoEmpregado(e: Empregado, hoje = hojeBrasil()) {
@@ -18,6 +18,7 @@ export async function validacoesDoEmpregado(e: Empregado, hoje = hojeBrasil()) {
     diasExperiencia: e.diasExperiencia,
     acordoEscrito12x36: e.acordo12x36,
     acordoCompensacao: e.acordoCompensacao,
+    limites: parametrosJornada(await registrosParametros(), hoje),
     hoje,
   });
 }

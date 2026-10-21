@@ -21,6 +21,7 @@ export interface DefinicaoParametro {
 
 const GOV_INSS = "https://www.gov.br/inss/pt-br/direitos-e-deveres/inscricao-e-contribuicao/tabela-de-contribuicao-mensal";
 const GOV_BF = "https://www.gov.br/mds/pt-br/acoes-e-programas/bolsa-familia";
+const LC150 = "https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp150.htm";
 const GOV_ESOCIAL = "https://www.gov.br/esocial/pt-br/empregador-domestico";
 
 export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
@@ -45,6 +46,13 @@ export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
   { chave: "BF_PROTECAO_LIMITE", rotulo: "Regra de proteção: renda por pessoa máxima", grupo: "Bolsa Família", tipo: "moeda", descricao: "Até este valor por pessoa a família fica na regra de proteção (R$ 706 desde jun/2025, Portaria MDS nº 1.084/2025).", fonte: GOV_BF },
   { chave: "BF_PROTECAO_PERCENTUAL", rotulo: "Regra de proteção: parte do benefício mantida", grupo: "Bolsa Família", tipo: "percentual", descricao: "Percentual do benefício pago durante a regra de proteção.", fonte: GOV_BF },
   { chave: "BF_PROTECAO_MESES", rotulo: "Regra de proteção: duração (meses)", grupo: "Bolsa Família", tipo: "numero", descricao: "Por quanto tempo a família fica na regra de proteção.", fonte: GOV_BF },
+  { chave: "JORNADA_PARCIAL_SEMANAL_MAX", rotulo: "Tempo parcial: horas por semana (máximo)", grupo: "Jornada e banco de horas", tipo: "numero", descricao: "LC 150, art. 3º.", fonte: LC150 },
+  { chave: "JORNADA_PARCIAL_DIARIA_MAX", rotulo: "Tempo parcial: horas por dia (máximo, já com a extra)", grupo: "Jornada e banco de horas", tipo: "numero", descricao: "LC 150, art. 3º, § 2º.", fonte: LC150 },
+  { chave: "JORNADA_PARCIAL_EXTRA_DIARIA", rotulo: "Tempo parcial: horas extras por dia (máximo)", grupo: "Jornada e banco de horas", tipo: "numero", descricao: "LC 150, art. 3º, § 2º (com acordo escrito). A LC 150 não prevê compensação/banco de horas no tempo parcial.", fonte: LC150 },
+  { chave: "JORNADA_LIMITE_DIARIO", rotulo: "Integral: horas por dia (máximo, já com extras)", grupo: "Jornada e banco de horas", tipo: "numero", descricao: "8h + 2h extras (CLT, art. 59, aplicada pela LC 150, art. 19).", fonte: "https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm" },
+  { chave: "JORNADA_12X36_MAX", rotulo: "Escala 12x36: horas por plantão", grupo: "Jornada e banco de horas", tipo: "numero", descricao: "LC 150, art. 10.", fonte: LC150 },
+  { chave: "BANCO_HORAS_PAGAS_MES", rotulo: "Banco de horas: extras pagas no mês", grupo: "Jornada e banco de horas", tipo: "numero", descricao: "Primeiras horas extras do mês pagas com adicional; as horas não trabalhadas no mês são abatidas delas (LC 150, art. 2º, § 5º, I e II).", fonte: LC150 },
+  { chave: "BANCO_HORAS_PRAZO_MESES", rotulo: "Banco de horas: prazo para compensar (meses)", grupo: "Jornada e banco de horas", tipo: "numero", descricao: "LC 150, art. 2º, § 5º, III.", fonte: LC150 },
   { chave: "BPC_FRACAO_SM", rotulo: "BPC: renda por pessoa (fração do salário mínimo)", grupo: "BPC", tipo: "numero", descricao: "Critério de renda do BPC/LOAS (Lei 8.742/1993, art. 20, § 3º): 0,25 = 1/4 do salário mínimo.", fonte: "https://www.gov.br/inss/pt-br/direitos-e-deveres/beneficios-assistenciais" },
 ];
 
@@ -88,6 +96,16 @@ export interface ParametrosSociais {
   bfProtecaoPercentual: number;
   bfProtecaoMeses: number;
   bpcFracaoSm: number;
+}
+
+export interface ParametrosJornada {
+  parcialSemanalMax: number;
+  parcialDiariaMax: number;
+  parcialExtraDiaria: number;
+  limiteDiario: number;
+  doze36Max: number;
+  bancoHorasPagasMes: number;
+  bancoHorasPrazoMeses: number;
 }
 
 function exigir<T>(v: T | undefined, chave: string, ref: Date): T {
@@ -156,4 +174,18 @@ export function parametrosSemConferencia(itens: { chave: string; ultimaConferenc
   return itens
     .filter((i) => !i.ultimaConferencia || soData(i.ultimaConferencia) < limite)
     .map((i) => ({ ...i, dias: i.ultimaConferencia ? diferencaDias(i.ultimaConferencia, hoje) : null }));
+}
+
+/** Limites de jornada e banco de horas vigentes na data. */
+export function parametrosJornada(lista: RegistroParametro[], ref: Date): ParametrosJornada {
+  const n = (k: string) => Number(exigir(valorVigente(lista, k, ref), k, ref));
+  return {
+    parcialSemanalMax: n("JORNADA_PARCIAL_SEMANAL_MAX"),
+    parcialDiariaMax: n("JORNADA_PARCIAL_DIARIA_MAX"),
+    parcialExtraDiaria: n("JORNADA_PARCIAL_EXTRA_DIARIA"),
+    limiteDiario: n("JORNADA_LIMITE_DIARIO"),
+    doze36Max: n("JORNADA_12X36_MAX"),
+    bancoHorasPagasMes: n("BANCO_HORAS_PAGAS_MES"),
+    bancoHorasPrazoMeses: n("BANCO_HORAS_PRAZO_MESES"),
+  };
 }

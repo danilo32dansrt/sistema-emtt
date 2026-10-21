@@ -1,6 +1,15 @@
 import { type DiaSemana, DIAS_SEMANA, addDias, data, diaSemana, ehFeriado, horaParaMinutos, minutosParaHora } from "./datas";
 import { arred } from "./dinheiro";
+import type { ParametrosJornada } from "./parametros";
+import { LIMITES_JORNADA_PADRAO } from "./parametros-padrao";
 import { type JornadaSemanal, type Regime, semanasDistintas } from "./salario";
+
+/**
+ * O que fazer com as horas que faltaram no dia (decisão do empregador, registrada com o motivo):
+ * ABONAR (não desconta), COMPENSAR (repor com horas a mais — só no integral com acordo escrito)
+ * ou DESCONTAR (padrão).
+ */
+export type TratamentoAusencia = "ABONAR" | "COMPENSAR" | "DESCONTAR";
 
 /** Fuso de Brasília (sem horário de verão desde 2019). */
 export const OFFSET_BRASILIA_MIN = -180;
@@ -39,6 +48,8 @@ export interface ConfigJornada {
   acordoIntervaloReduzido?: boolean;
   /** Empregado que reside no local de trabalho (intervalo pode ser fracionado). */
   residenteNoLocal?: boolean;
+  /** Limites legais vigentes (tabela de parâmetros). */
+  limites?: ParametrosJornada;
 }
 
 export interface EntradaDia {
@@ -53,6 +64,8 @@ export interface EntradaDia {
   abonado?: boolean;
   /** Dia em viagem de acompanhamento (adicional de 25%). */
   viagem?: boolean;
+  /** Decisão do empregador sobre as horas que faltaram no dia. */
+  tratamento?: TratamentoAusencia;
   /** Última saída da jornada anterior (para checar as 11h de interjornada). */
   ultimaSaidaAnterior?: Date | null;
 }
@@ -69,6 +82,8 @@ export interface ResultadoDia {
   extras50: number;
   extras100: number;
   atraso: number;
+  /** Horas que faltaram e que o empregador decidiu compensar (minutos). */
+  aCompensar: number;
   falta: boolean;
   faltaJustificada: boolean;
   viagem: number;
@@ -85,6 +100,8 @@ function sobreposicao(a: number, b: number, c: number, d: number) {
 
 export function calcularDia(e: EntradaDia): ResultadoDia {
   const cfg = e.config;
+  const L = cfg.limites ?? LIMITES_JORNADA_PADRAO;
+  const abonado = e.abonado || e.tratamento === "ABONAR";
   const tolMarc = cfg.toleranciaMarcacao ?? 5;
   const tolDia = cfg.toleranciaDiaria ?? 10;
   const ds = DIAS_SEMANA[diaSemana(e.data)];
@@ -138,12 +155,14 @@ export function calcularDia(e: EntradaDia): ResultadoDia {
   let extras50 = 0;
   let extras100 = 0;
   let atraso = 0;
+  let aCompensar = 0;
   let falta = false;
   let faltaJustificada = false;
 
   if (ordenadas.length === 0) {
     if (previsto > 0) {
-      if (e.abonado) faltaJustificada = true;
+      if (abonado) faltaJustificada = true;
+      else if (e.tratamento === "COMPENSAR") aCompensar = previsto;
       else falta = true;
     }
   } else if (previsto === 0 && domingoOuFeriado && cfg.regime !== "DOZE_X_TRINTA_SEIS") {
@@ -162,18 +181,19 @@ export function calcularDia(e: EntradaDia): ResultadoDia {
     }
     if (diferenca > 0) extras50 = diferenca;
     else if (diferenca < 0) {
-      if (e.abonado) faltaJustificada = true;
+      if (abonado) faltaJustificada = true;
+      else if (e.tratamento === "COMPENSAR") aCompensar = -diferenca;
       else atraso = -diferenca;
     }
   }
 
   // Limites legais por regime
-  if (cfg.regime === "INTEGRAL" && trabalhadoComputado > 600) inconsistencias.push("Jornada acima de 10h (8h + 2h extras).");
+  if (cfg.regime === "INTEGRAL" && trabalhadoComputado > L.limiteDiario * 60) inconsistencias.push(`Jornada acima de ${L.limiteDiario}h no dia (limite com as horas extras).`);
   if (cfg.regime === "PARCIAL") {
-    if (trabalhadoComputado > 360) inconsistencias.push("Tempo parcial: jornada acima de 6h diárias.");
-    if (extras50 > 60) inconsistencias.push("Tempo parcial: hora extra limitada a 1h por dia.");
+    if (trabalhadoComputado > L.parcialDiariaMax * 60) inconsistencias.push(`Tempo parcial: jornada acima de ${L.parcialDiariaMax}h diárias.`);
+    if (extras50 > L.parcialExtraDiaria * 60) inconsistencias.push(`Tempo parcial: hora extra limitada a ${L.parcialExtraDiaria}h por dia.`);
   }
-  if (cfg.regime === "DOZE_X_TRINTA_SEIS" && trabalhadoComputado > 720 + tolDia) inconsistencias.push("Escala 12x36: jornada acima de 12h.");
+  if (cfg.regime === "DOZE_X_TRINTA_SEIS" && trabalhadoComputado > L.doze36Max * 60 + tolDia) inconsistencias.push(`Escala 12x36: jornada acima de ${L.doze36Max}h.`);
 
   const pares2 = pares.map(([a, b]) => ({ entrada: minutosParaHora(a % 1440), saida: minutosParaHora(b % 1440) }));
   return {
@@ -188,6 +208,7 @@ export function calcularDia(e: EntradaDia): ResultadoDia {
     extras50,
     extras100,
     atraso,
+    aCompensar,
     falta,
     faltaJustificada,
     viagem: e.viagem ? trabalhadoComputado : 0,
@@ -235,36 +256,54 @@ export interface ResumoMes {
   extrasPagas50: number;
   paraBanco: number;
   atrasoDescontado: number;
+  /** Horas que o empregador marcou para compensar no mês (minutos). */
+  aCompensar: number;
   inconsistencias: number;
+  /** Explicações em linguagem simples sobre a regra aplicada. */
+  observacoes: string[];
 }
 
 /**
- * Consolida o mês. Com acordo de compensação: as horas a menos compensam as extras;
- * das extras que sobram, as primeiras 40h são pagas e o excedente vai para o banco
- * (compensável em até 1 ano — LC 150, art. 2º, § 5º).
+ * Consolida o mês conforme o regime (LC 150):
+ * - INTEGRAL com acordo escrito de compensação (art. 2º, §§ 4º e 5º): as horas não trabalhadas no mês
+ *   (atrasos, saídas antecipadas e dias marcados para compensar) são abatidas das horas extras do mês,
+ *   hora por hora; das extras que sobram, as primeiras 40h são pagas e o excedente vai para o banco
+ *   (compensável em até 1 ano). O que ficar devendo no fim do mês é descontado — não se leva dívida
+ *   de horas para o mês seguinte nem para a rescisão.
+ * - TEMPO PARCIAL (art. 3º, § 2º) e 12x36: a lei não prevê compensação. Hora a menos é descontada
+ *   (ou abonada) e hora a mais é paga com adicional, sem trocar uma pela outra.
  */
 export function consolidarMes(dias: ResultadoDia[], config: ConfigJornada, saldoBancoAnterior = 0): ResumoMes {
+  const L = config.limites ?? LIMITES_JORNADA_PADRAO;
   const soma = (f: (d: ResultadoDia) => number) => dias.reduce((t, d) => t + f(d), 0);
   const extras50 = soma((d) => d.extras50);
   const atraso = soma((d) => d.atraso);
+  const aCompensar = soma((d) => d.aCompensar);
   const datasFalta = dias.filter((d) => d.falta).map((d) => d.data);
+  const observacoes: string[] = [];
 
   let compensado = 0;
   let extrasPagas50 = extras50;
   let paraBanco = 0;
-  let atrasoDescontado = atraso;
-  if (config.acordoCompensacao) {
-    compensado = Math.min(extras50, atraso);
+  let atrasoDescontado = atraso + aCompensar;
+  const permiteCompensacao = config.regime === "INTEGRAL" && Boolean(config.acordoCompensacao);
+  if (permiteCompensacao) {
+    const devido = atraso + aCompensar;
+    compensado = Math.min(extras50, devido);
     const sobra = extras50 - compensado;
-    atrasoDescontado = atraso - compensado;
-    extrasPagas50 = Math.min(sobra, 40 * 60);
+    atrasoDescontado = devido - compensado;
+    extrasPagas50 = Math.min(sobra, L.bancoHorasPagasMes * 60);
     paraBanco = sobra - extrasPagas50;
-    // Saldo anterior de banco pode cobrir atrasos restantes
+    // Saldo positivo de meses anteriores (dentro do prazo de 1 ano) pode cobrir o que faltou
     if (saldoBancoAnterior > 0 && atrasoDescontado > 0) {
       const usar = Math.min(saldoBancoAnterior, atrasoDescontado);
       atrasoDescontado -= usar;
       paraBanco -= usar;
     }
+    if (atrasoDescontado > 0 && aCompensar > 0) observacoes.push("Horas a compensar não repostas até o fim do mês foram descontadas.");
+  } else {
+    if (config.regime === "PARCIAL" && config.acordoCompensacao) observacoes.push("Tempo parcial: a LC 150 não prevê compensação; horas a menos são descontadas e horas a mais pagas com adicional.");
+    if (aCompensar > 0) observacoes.push(config.regime === "INTEGRAL" ? "Sem acordo escrito de compensação: as horas marcadas para compensar foram descontadas." : "Neste regime não há compensação: as horas marcadas para compensar foram descontadas.");
   }
 
   return {
@@ -275,6 +314,7 @@ export function consolidarMes(dias: ResultadoDia[], config: ConfigJornada, saldo
     extras100: soma((d) => d.extras100),
     noturno: arred(soma((d) => d.noturnoConvertido), 2),
     atraso,
+    aCompensar,
     faltas: datasFalta.length,
     faltasJustificadas: dias.filter((d) => d.faltaJustificada).length,
     semanasComFalta: semanasDistintas(datasFalta),
@@ -285,6 +325,7 @@ export function consolidarMes(dias: ResultadoDia[], config: ConfigJornada, saldo
     paraBanco,
     atrasoDescontado,
     inconsistencias: soma((d) => d.inconsistencias.length),
+    observacoes,
   };
 }
 

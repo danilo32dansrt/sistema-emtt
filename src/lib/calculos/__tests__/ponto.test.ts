@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agruparJornadas, calcularDia, consolidarMes, data, instanteLocal, partesLocais, type ConfigJornada } from "..";
+import { agruparJornadas, calcularDia, consolidarMes, data, instanteLocal, LIMITES_JORNADA_PADRAO as LIM, partesLocais, type ConfigJornada } from "..";
 
 const integral: ConfigJornada = {
   regime: "INTEGRAL",
@@ -113,5 +113,101 @@ describe("agrupamento e consolidação", () => {
     expect(comAcordo.extrasPagas50).toBe(2400);
     expect(comAcordo.paraBanco).toBe(540);
     expect(comAcordo.atrasoDescontado).toBe(0);
+  });
+});
+
+describe("banco de horas por regime (LC 150)", () => {
+  // Tempo parcial de 22h: segunda 6h, terça a sexta 4h (o exemplo do dono do projeto)
+  const parcial: ConfigJornada = { regime: "PARCIAL", horasSemanais: 22, jornada: { seg: 6, ter: 4, qua: 4, qui: 4, sex: 4 }, acordoCompensacao: true };
+  const s2 = data(2026, 3, 2); // segunda
+  const t3 = data(2026, 3, 3);
+  const q4 = data(2026, 3, 4);
+  const q5 = data(2026, 3, 5);
+  const semanaParcial = (tratamento?: "COMPENSAR" | "ABONAR") => [
+    calcularDia({ data: s2, marcacoes: m(s2, "08:00", "12:00"), config: parcial, tratamento }), // 4h de 6h: -2h
+    calcularDia({ data: t3, marcacoes: m(t3, "08:00", "11:00"), config: parcial, tratamento }), // 3h de 4h: -1h
+    calcularDia({ data: q4, marcacoes: m(q4, "08:00", "10:00"), config: parcial, tratamento }), // 2h de 4h: -2h
+    calcularDia({ data: q5, marcacoes: m(q5, "08:00", "13:00"), config: parcial }), // 5h de 4h: +1h
+  ];
+
+  it("tempo parcial: não compensa — desconta as 5h e paga a 1h extra com adicional, mesmo com acordo", () => {
+    const r = consolidarMes(semanaParcial(), parcial);
+    expect(r.atrasoDescontado).toBe(300);
+    expect(r.extrasPagas50).toBe(60);
+    expect(r.compensado).toBe(0);
+    expect(r.paraBanco).toBe(0);
+    expect(r.observacoes[0]).toContain("não prevê compensação");
+  });
+
+  it("tempo parcial: marcar 'compensar' não troca hora por hora; as horas são descontadas e o motivo explicado", () => {
+    const r = consolidarMes(semanaParcial("COMPENSAR"), parcial);
+    expect(r.aCompensar).toBe(300);
+    expect(r.atrasoDescontado).toBe(300);
+    expect(r.extrasPagas50).toBe(60);
+    expect(r.observacoes.join(" ")).toContain("Neste regime não há compensação");
+  });
+
+  it("tempo parcial: abonar não desconta nada", () => {
+    const r = consolidarMes(semanaParcial("ABONAR"), parcial);
+    expect(r.atrasoDescontado).toBe(0);
+    expect(r.extrasPagas50).toBe(60);
+  });
+
+  it("tempo parcial: limites vêm da tabela de parâmetros (1h extra e 6h no dia)", () => {
+    const d = calcularDia({ data: q5, marcacoes: m(q5, "08:00", "14:30"), config: parcial });
+    expect(d.inconsistencias).toContain("Tempo parcial: jornada acima de 6h diárias.");
+    expect(d.inconsistencias).toContain("Tempo parcial: hora extra limitada a 1h por dia.");
+    const outro = calcularDia({ data: q5, marcacoes: m(q5, "08:00", "14:30"), config: { ...parcial, limites: { ...LIM, parcialDiariaMax: 7, parcialExtraDiaria: 3 } } });
+    expect(outro.inconsistencias).not.toContain("Tempo parcial: jornada acima de 6h diárias.");
+    expect(outro.inconsistencias.some((i) => i.includes("hora extra limitada"))).toBe(false);
+  });
+
+  const integralAcordo: ConfigJornada = { regime: "INTEGRAL", horasSemanais: 40, jornada: { seg: 8, ter: 8, qua: 8, qui: 8, sex: 8 }, acordoCompensacao: true };
+  const dia = (d: Date, ini: string, fim: string, tratamento?: "COMPENSAR") => calcularDia({ data: d, marcacoes: m(d, ini, "12:00", "13:00", fim), config: integralAcordo, tratamento });
+
+  it("integral com acordo: horas a menos abatem das extras do mês, hora por hora (art. 2º, § 5º, II)", () => {
+    const dias = [dia(s2, "08:00", "15:00"), dia(t3, "08:00", "13:00"), dia(q4, "08:00", "19:00"), dia(q5, "08:00", "19:00")];
+    // -2h, -4h, +2h, +2h
+    const r = consolidarMes(dias, integralAcordo);
+    expect(r.compensado).toBe(240);
+    expect(r.atrasoDescontado).toBe(120);
+    expect(r.extrasPagas50).toBe(0);
+  });
+
+  it("integral com acordo: dia inteiro marcado para compensar é reposto com as extras e não vira falta", () => {
+    const folga = calcularDia({ data: s2, marcacoes: [], config: integralAcordo, tratamento: "COMPENSAR" });
+    expect(folga.falta).toBe(false);
+    expect(folga.aCompensar).toBe(480);
+    const extras = [t3, q4, q5, data(2026, 3, 6), data(2026, 3, 9)].map((d) => dia(d, "08:00", "19:00")); // 5 × 2h = 10h
+    const r = consolidarMes([folga, ...extras], integralAcordo);
+    expect(r.faltas).toBe(0);
+    expect(r.compensado).toBe(480);
+    expect(r.extrasPagas50).toBe(120);
+    expect(r.atrasoDescontado).toBe(0);
+  });
+
+  it("integral com acordo: o que não foi reposto no mês é descontado (não vira dívida para o mês seguinte)", () => {
+    const folga = calcularDia({ data: s2, marcacoes: [], config: integralAcordo, tratamento: "COMPENSAR" });
+    const r = consolidarMes([folga, dia(t3, "08:00", "19:00")], integralAcordo);
+    expect(r.compensado).toBe(120);
+    expect(r.atrasoDescontado).toBe(360);
+    expect(r.observacoes[0]).toContain("descontadas");
+  });
+
+  it("integral com acordo: só as primeiras 40h extras do mês são pagas; o resto vai para o banco", () => {
+    const dias = Array.from({ length: 22 }, (_, i) => data(2026, 3, 2 + i)).filter((d) => d.getUTCDay() > 0 && d.getUTCDay() < 6).map((d) => dia(d, "08:00", "20:00"));
+    const r = consolidarMes(dias, integralAcordo);
+    expect(r.extras50).toBe(dias.length * 180); // 16 dias × 3h = 48h
+    expect(r.extrasPagas50).toBe(40 * 60);
+    expect(r.paraBanco).toBe(8 * 60);
+  });
+
+  it("integral sem acordo: não compensa; horas marcadas para compensar são descontadas", () => {
+    const semAcordo = { ...integralAcordo, acordoCompensacao: false };
+    const folga = calcularDia({ data: s2, marcacoes: [], config: semAcordo, tratamento: "COMPENSAR" });
+    const r = consolidarMes([folga, calcularDia({ data: t3, marcacoes: m(t3, "08:00", "12:00", "13:00", "19:00"), config: semAcordo })], semAcordo);
+    expect(r.atrasoDescontado).toBe(480);
+    expect(r.extrasPagas50).toBe(120);
+    expect(r.observacoes[0]).toContain("Sem acordo escrito");
   });
 });

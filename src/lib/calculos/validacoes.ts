@@ -1,3 +1,5 @@
+import type { ParametrosJornada } from "./parametros";
+import { LIMITES_JORNADA_PADRAO } from "./parametros-padrao";
 import { addDias, diferencaDias, idade, soData } from "./datas";
 import { formatarMoeda } from "./dinheiro";
 import {
@@ -65,6 +67,8 @@ export interface DadosValidacaoEmpregado {
   acordoEscrito12x36?: boolean;
   acordoCompensacao?: boolean;
   hoje?: Date;
+  /** Limites legais vigentes (tabela de parâmetros). */
+  limites?: ParametrosJornada;
 }
 
 /** Validações obrigatórias do cadastro de empregado (seção 2.2). */
@@ -74,6 +78,7 @@ export function validarEmpregado(d: DadosValidacaoEmpregado): AlertaValidacao[] 
   const diaria = maiorJornadaDiaria(d.jornada);
   const dias = diasTrabalhadosPorSemana(d.jornada);
   const hoje = d.hoje ?? new Date();
+  const L = d.limites ?? LIMITES_JORNADA_PADRAO;
 
   if (d.cpf !== undefined && !cpfValido(d.cpf)) {
     alertas.push({ codigo: "CPF_INVALIDO", severidade: "critico", mensagem: "CPF inválido." });
@@ -97,14 +102,14 @@ export function validarEmpregado(d: DadosValidacaoEmpregado): AlertaValidacao[] 
   }
 
   if (d.regime === "PARCIAL") {
-    if (semanais > 25) alertas.push({ codigo: "PARCIAL_SEMANAL", severidade: "critico", mensagem: `Jornada parcial de ${semanais}h passa do limite de 25h semanais (LC 150, art. 3º).` });
-    if (diaria > 6) alertas.push({ codigo: "PARCIAL_DIARIA", severidade: "critico", mensagem: `Jornada parcial com ${diaria}h em um dia; o limite é 6h diárias (LC 150, art. 3º, § 2º).` });
+    if (semanais > L.parcialSemanalMax) alertas.push({ codigo: "PARCIAL_SEMANAL", severidade: "critico", mensagem: `Jornada parcial de ${semanais}h passa do limite de ${L.parcialSemanalMax}h semanais (LC 150, art. 3º).` });
+    if (diaria > L.parcialDiariaMax) alertas.push({ codigo: "PARCIAL_DIARIA", severidade: "critico", mensagem: `Jornada parcial com ${diaria}h em um dia; o limite é ${L.parcialDiariaMax}h diárias (LC 150, art. 3º, § 2º).` });
   }
   if (d.regime === "INTEGRAL") {
     if (semanais > 44) alertas.push({ codigo: "INTEGRAL_SEMANAL", severidade: "critico", mensagem: `Jornada de ${semanais}h passa de 44h semanais (LC 150, art. 2º).` });
     if (diaria > 8 && !d.acordoCompensacao) alertas.push({ codigo: "INTEGRAL_DIARIA", severidade: "aviso", mensagem: `Jornada de ${diaria}h em um dia passa de 8h; só é permitida com acordo de compensação escrito.` });
-    if (diaria > 10) alertas.push({ codigo: "INTEGRAL_DIARIA_MAX", severidade: "critico", mensagem: `Jornada de ${diaria}h em um dia passa do limite de 10h (8h + 2h extras).` });
-    if (semanais > 0 && semanais <= 25) alertas.push({ codigo: "INTEGRAL_COM_JORNADA_PARCIAL", severidade: "info", mensagem: "Jornada de até 25h: avalie cadastrar como tempo parcial." });
+    if (diaria > L.limiteDiario) alertas.push({ codigo: "INTEGRAL_DIARIA_MAX", severidade: "critico", mensagem: `Jornada de ${diaria}h em um dia passa do limite de ${L.limiteDiario}h (8h + 2h extras).` });
+    if (semanais > 0 && semanais <= L.parcialSemanalMax) alertas.push({ codigo: "INTEGRAL_COM_JORNADA_PARCIAL", severidade: "info", mensagem: `Jornada de até ${L.parcialSemanalMax}h: avalie cadastrar como tempo parcial.` });
   }
   if (d.regime === "DOZE_X_TRINTA_SEIS" && !d.acordoEscrito12x36) {
     alertas.push({ codigo: "SEM_ACORDO_12X36", severidade: "critico", mensagem: "Escala 12x36 exige acordo escrito entre as partes (LC 150, art. 10)." });

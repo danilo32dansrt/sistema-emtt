@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { espelhoDoMes } from "@/lib/servicos/ponto";
 import { Formulario } from "./Formulario";
 import { TabelaEspelho } from "./TabelaEspelho";
-import { Cartao, Indicador, Selo } from "./ui";
+import { Aviso, Cartao, Indicador, Selo } from "./ui";
 
 /** Espelho mensal com resumo em horas e em reais por rubrica (para consultor e empregador). */
 export async function EspelhoEmpregado({ empregado, ano, mes, base, podeGerarLancamento }: { empregado: Empregado; ano: number; mes: number; base: string; podeGerarLancamento: boolean }) {
@@ -32,10 +32,11 @@ export async function EspelhoEmpregado({ empregado, ano, mes, base, podeGerarLan
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Indicador rotulo="Trabalhado / previsto" valor={`${formatarNumero(esp.horas.trabalhado)}h`} detalhe={`previsto ${formatarNumero(esp.horas.previsto)}h`} />
-        <Indicador rotulo="Extras a pagar" valor={`${formatarNumero(esp.horas.extras50 + esp.horas.extras100)}h`} cor="amarelo" detalhe={empregado.acordoCompensacao ? `banco: ${formatarNumero(esp.horas.banco)}h` : "sem acordo de compensação"} />
+        <Indicador rotulo="Extras a pagar" valor={`${formatarNumero(esp.horas.extras50 + esp.horas.extras100)}h`} cor="amarelo" detalhe={empregado.regime === "INTEGRAL" && empregado.acordoCompensacao ? `banco: ${formatarNumero(esp.horas.banco)}h` : empregado.regime === "INTEGRAL" ? "sem acordo de compensação" : "regime sem banco de horas"} />
         <Indicador rotulo="Faltas" valor={esp.resumo.faltas} cor={esp.resumo.faltas ? "vermelho" : "verde"} detalhe={`${esp.resumo.faltasJustificadas} justificada(s)`} />
         <Indicador rotulo="Ocorrências" valor={esp.resumo.inconsistencias} cor={esp.resumo.inconsistencias ? "vermelho" : "verde"} />
       </div>
+      {esp.resumo.observacoes.map((o) => <Aviso key={o}>{o}</Aviso>)}
       <Cartao titulo="Resumo para a folha (rubricas do eSocial)">
         <ul className="divide-y divide-slate-100 text-sm">
           {rubricas.filter((r) => r[2] !== 0).map((r) => (

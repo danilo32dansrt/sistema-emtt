@@ -1,6 +1,17 @@
 import { data } from "./datas";
-import type { RegistroParametro } from "./parametros";
+import type { ParametrosJornada, RegistroParametro } from "./parametros";
 import { TABELAS_PADRAO } from "./tabelas";
+
+/** Limites de jornada e banco de horas da LC 150 (valores iniciais; no sistema vêm da tabela de parâmetros). */
+export const LIMITES_JORNADA_PADRAO: ParametrosJornada = {
+  parcialSemanalMax: 25,
+  parcialDiariaMax: 6,
+  parcialExtraDiaria: 1,
+  limiteDiario: 10,
+  doze36Max: 12,
+  bancoHorasPagasMes: 40,
+  bancoHorasPrazoMeses: 12,
+};
 
 /**
  * Valores iniciais (carga do banco e testes). No sistema, tudo é editável na tela
@@ -39,4 +50,11 @@ export const PARAMETROS_PADRAO: (RegistroParametro & { fonte?: string; observaca
   { chave: "BF_PROTECAO_LIMITE", valor: 759, vigenciaInicio: data(2025, 1, 1), observacao: "Meio salário mínimo de 2025." },
   { chave: "BF_PROTECAO_LIMITE", valor: 706, vigenciaInicio: data(2025, 6, 1), observacao: "Portaria MDS nº 1.084/2025: teto fixo de R$ 706 por pessoa." },
   { chave: "BPC_FRACAO_SM", valor: 0.25, vigenciaInicio: data(1993, 12, 7) },
+  { chave: "JORNADA_PARCIAL_SEMANAL_MAX", valor: LIMITES_JORNADA_PADRAO.parcialSemanalMax, vigenciaInicio: data(2015, 6, 2) },
+  { chave: "JORNADA_PARCIAL_DIARIA_MAX", valor: LIMITES_JORNADA_PADRAO.parcialDiariaMax, vigenciaInicio: data(2015, 6, 2) },
+  { chave: "JORNADA_PARCIAL_EXTRA_DIARIA", valor: LIMITES_JORNADA_PADRAO.parcialExtraDiaria, vigenciaInicio: data(2015, 6, 2) },
+  { chave: "JORNADA_LIMITE_DIARIO", valor: LIMITES_JORNADA_PADRAO.limiteDiario, vigenciaInicio: data(2015, 6, 2) },
+  { chave: "JORNADA_12X36_MAX", valor: LIMITES_JORNADA_PADRAO.doze36Max, vigenciaInicio: data(2015, 6, 2) },
+  { chave: "BANCO_HORAS_PAGAS_MES", valor: LIMITES_JORNADA_PADRAO.bancoHorasPagasMes, vigenciaInicio: data(2015, 6, 2) },
+  { chave: "BANCO_HORAS_PRAZO_MESES", valor: LIMITES_JORNADA_PADRAO.bancoHorasPrazoMeses, vigenciaInicio: data(2015, 6, 2) },
 ];

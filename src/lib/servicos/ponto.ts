@@ -2,10 +2,11 @@ import "server-only";
 import type { Empregado } from "@prisma/client";
 import {
   addDias, agruparJornadas, calcularDia, hojeBrasil, consolidarMes, data, diasDoMes, ehDiaDeTrabalho12x36, partesLocais, soData, ultimoDiaMes,
-  valorAdicionalNoturno, valorHorasExtras, descontoFaltas, descontoAtrasos, arred, type ResultadoDia,
+  valorAdicionalNoturno, valorHorasExtras, descontoFaltas, descontoAtrasos, arred, parametrosJornada, type ResultadoDia,
 } from "@/lib/calculos";
 import { configJornada, num } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
+import { registrosParametros } from "@/lib/tabelas-db";
 
 /**
  * Monta o espelho do mês: marcações originais + ajustes aprovados (inclusões e
@@ -29,7 +30,7 @@ export async function espelhoDoMes(e: Empregado, ano: number, mes: number, hoje:
     ...ajustes.filter((a) => a.tipo === "INCLUSAO" && a.dataHora).map((a) => a.dataHora!),
   ];
   const jornadas = agruparJornadas(instantes);
-  const cfg = configJornada(e);
+  const cfg = { ...configJornada(e), limites: parametrosJornada(await registrosParametros(), fim) };
 
   const diaJustificado = (d: Date) =>
     justificativas.find((j) => soData(d) >= j.data && soData(d) <= (j.dataFim ?? j.data));

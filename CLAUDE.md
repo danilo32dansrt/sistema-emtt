@@ -89,6 +89,12 @@ valores em reais com 2 casas e datas dd/mm/aaaa.
 - Guarda dos registros por pelo menos 5 anos, com acesso garantido ao empregado.
 - Regimes: integral (8h/44h); parcial (25h, extra de 1h/dia com acordo, até 6h/dia); 12x36 (acordo escrito; feriados e DSR compensados); viagem (adicional mínimo de 25%); experiência até 90 dias.
 - Cálculos: extra 50%; domingo/feriado não compensado em dobro; banco de horas (40h pagas no mês salvo compensação; excedente compensável em 1 ano; só com acordo); intervalo 1h–2h (30 min com acordo; fracionável para quem reside) e intervalo suprimido pago com 50%; interjornada 11h; DSR 24h; noturno 22h–5h com hora de 52min30s e adicional de 20%; faltas descontam também o DSR; justificadas com comprovante não descontam; bloquear/alertar limites do regime.
+- **Banco de horas por regime (decidido com o dono):** INTEGRAL com acordo escrito — horas a menos no mês (atrasos, saídas
+  antecipadas, dias marcados "compensar") abatem das extras do mês hora por hora (art. 2º, § 5º, II); 40 primeiras pagas;
+  excedente no banco por 1 ano; o que ficar devendo no fim do mês é descontado (sem dívida para o mês seguinte nem para a
+  rescisão). TEMPO PARCIAL e 12x36 — sem compensação (a LC 150, art. 3º, § 2º, não remete aos §§ 4º e 5º do art. 2º): hora a
+  menos é descontada ou abonada; hora a mais paga com 50% (parcial: até 1h/dia e 6h no dia). Ausências têm tratamento
+  ABONAR / COMPENSAR / DESCONTAR. Limites na tabela de parâmetros (grupo "Jornada e banco de horas").
 - Fluxo: empregado marca (selfie + localização, offline com horário real); sistema calcula diariamente; empregador aprova ou pede ajuste (nunca apaga); espelho no fim do mês assinado pelos dois; consultor recebe o resumo em reais por rubrica.
 - eSocial: versão inicial gera o resumo de rubricas para lançamento manual; webservice direto é estudo futuro.
 

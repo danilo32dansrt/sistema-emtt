@@ -5,7 +5,8 @@ import { num } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
 import { configuracao, modelosMensagem } from "@/lib/tabelas-db";
 import { configInter } from "@/lib/inter/api";
-import { cadastrarWebhookInter, removerPreco, salvarCobrancaInter, salvarConfiguracao, salvarModelo, salvarPreco, testarConexaoInter } from "./acoes";
+import { PLANOS } from "@/lib/inter/plus";
+import { cadastrarWebhookInter, removerPreco, salvarCobrancaInter, salvarConfiguracao, salvarModelo, salvarPlanos, salvarPreco, testarConexaoInter } from "./acoes";
 
 export const metadata = { title: "Configurações" };
 
@@ -37,6 +38,30 @@ export default async function Configuracoes() {
             </Grade>
           </Formulario>
         </Cartao>
+
+        <div id="planos">
+          <Cartao titulo="Planos para o empregador">
+            <div className="mb-4 grid gap-3 md:grid-cols-3">
+              {(Object.keys(PLANOS) as (keyof typeof PLANOS)[]).map((k) => (
+                <div key={k} className="rounded-xl border border-slate-200 p-3 text-sm">
+                  <p className="font-bold text-marca-700">{PLANOS[k].nome}</p>
+                  <p className="mb-2 text-slate-600">{PLANOS[k].resumo}</p>
+                  <ul className="list-disc space-y-0.5 pl-5">{PLANOS[k].itens.map((i) => <li key={i}>{i}</li>)}</ul>
+                </div>
+              ))}
+            </div>
+            <Formulario acao={salvarPlanos}>
+              <Grade colunas={3}>
+                <Campo rotulo="Preço do Básico (R$/mês)" name="precoBasico" inputMode="decimal" defaultValue={cfg.precoBasico ? String(num(cfg.precoBasico)).replace(".", ",") : ""} />
+                <Campo rotulo="Preço do Médio (R$/mês)" name="precoMedio" inputMode="decimal" defaultValue={cfg.precoMedio ? String(num(cfg.precoMedio)).replace(".", ",") : ""} />
+                <Campo rotulo="Preço do Plus (R$/mês)" name="precoPlus" inputMode="decimal" defaultValue={cfg.precoPlus ? String(num(cfg.precoPlus)).replace(".", ",") : ""} />
+              </Grade>
+              <Campo rotulo="Plus: dia de vencimento da cobrança (mensalidade + DAE)" name="diaVencimentoPlus" type="number" min={1} max={6} defaultValue={cfg.diaVencimentoPlus} ajuda="Precisa ser antes do vencimento do DAE (dia 7) para dar tempo de pagar. Se o patrão não pagar, a consultoria não paga o DAE com dinheiro próprio." />
+              <Marcador rotulo="Plus: pagar o DAE automaticamente pelo Inter (precisa da permissão “Pagamentos” na integração do Inter)" name="pagamentoDaeInter" defaultChecked={cfg.pagamentoDaeInter} />
+            </Formulario>
+            <p className="mt-3 text-xs text-slate-500">O preço de cada cliente é o valor da mensalidade no cadastro dele. Combine com o contador o registro do dinheiro do DAE como repasse e inclua no contrato a cláusula de pagamento por conta e ordem do cliente.</p>
+          </Cartao>
+        </div>
 
         <div id="inter">
           <Cartao titulo="Cobrança automática das mensalidades (Banco Inter PJ)" acoes={inter.configurado ? <Selo cor={inter.ambiente === "producao" ? "verde" : "amarelo"}>{inter.ambiente === "producao" ? "produção" : "ambiente de testes"}</Selo> : <Selo>não configurado</Selo>}>

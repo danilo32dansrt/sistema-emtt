@@ -48,6 +48,13 @@ enum StatusSolicitacao {
   REJEITADO
 }
 
+/// Plano contratado pelo empregador
+enum PlanoCliente {
+  BASICO
+  MEDIO
+  PLUS
+}
+
 enum StatusCobranca {
   ABERTO
   PAGO
@@ -155,6 +162,14 @@ model Configuracao {
   jurosMensalidade     Decimal @default(1) @db.Decimal(5, 2)
   /// Dias após o vencimento em que o Inter cancela sozinho a cobrança não paga (0 a 60)
   diasBaixaInter       Int     @default(30)
+  /// Preços sugeridos de cada plano (mensal) — usados ao cadastrar o cliente
+  precoBasico          Decimal? @db.Decimal(12, 2)
+  precoMedio           Decimal? @db.Decimal(12, 2)
+  precoPlus            Decimal? @db.Decimal(12, 2)
+  /// Plano Plus: dia de vencimento da cobrança única (mensalidade + DAE)
+  diaVencimentoPlus    Int      @default(5)
+  /// Plano Plus: pagar o DAE automaticamente pela API do Inter (senão, o consultor paga e marca como pago)
+  pagamentoDaeInter    Boolean  @default(false)
 }
 
 /// Tabela única de parâmetros legais com data de vigência (histórico: uma linha por vigência).
@@ -219,6 +234,7 @@ model Cliente {
   inicioContrato     DateTime         @db.Date
   mensalidade        Decimal          @db.Decimal(12, 2)
   diaVencimento      Int              @default(10)
+  plano              PlanoCliente     @default(BASICO)
   procuracaoStatus   StatusProcuracao @default(PENDENTE)
   procuracaoValidade DateTime?        @db.Date
   observacoes        String?
@@ -231,6 +247,7 @@ model Cliente {
   ocorrencias    OcorrenciaDisciplinar[]
   usuarios       Usuario[]
   mensalidades   Mensalidade[]
+  pagamentosDae  PagamentoDae[]
   servicos       ServicoAvulso[]
   documentos     Documento[]
   mensagens      Mensagem[]
@@ -365,6 +382,7 @@ model Competencia {
   daeValor                   Decimal?  @db.Decimal(12, 2)
   daeCodigo                  String?
   daeArquivoId               String?
+  pagamentoDae               PagamentoDae?
   comprovanteArquivoId       String?
   clienteInformouPagamentoEm DateTime?
   observacoes                String?
@@ -577,6 +595,9 @@ model Mensalidade {
   pixCopiaECola     String?
   interAtualizadoEm DateTime?
   interErro         String?
+  /// Plano Plus: parte da cobrança que é o DAE a repassar (soma dos DAEs dos empregados)
+  valorDae          Decimal        @default(0) @db.Decimal(12, 2)
+  pagamentosDae     PagamentoDae[]
 
   @@unique([clienteId, ano, mes])
   @@index([status, vencimento])
@@ -745,4 +766,30 @@ model Notificacao {
 
   @@unique([usuarioId, chave])
   @@index([usuarioId, lidaEm])
+}
+
+/// Plano Plus: DAE pago pela consultoria por conta e ordem do cliente, com o dinheiro recebido dele.
+model PagamentoDae {
+  id             String       @id @default(cuid())
+  competenciaId  String       @unique
+  competencia    Competencia  @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  clienteId      String
+  cliente        Cliente      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  mensalidadeId  String?
+  mensalidade    Mensalidade? @relation(fields: [mensalidadeId], references: [id], onDelete: SetNull)
+  valor          Decimal      @db.Decimal(12, 2)
+  codigoBarras   String
+  vencimento     DateTime     @db.Date
+  /// AGUARDANDO_RECURSO, PRONTO, AGENDADO, AGUARDANDO_APROVACAO, PAGO, FALHA, CANCELADO
+  status         String       @default("AGUARDANDO_RECURSO")
+  interTransacao String?      @unique
+  interStatus    String?
+  agendadoPara   DateTime?    @db.Date
+  pagoEm         DateTime?
+  erro           String?
+  criadoEm       DateTime     @default(now())
+  atualizadoEm   DateTime     @updatedAt
+
+  @@index([status])
+  @@index([clienteId])
 }

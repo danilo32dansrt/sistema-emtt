@@ -23,6 +23,7 @@ const esquemaCliente = z.object({
   inicioContrato: dataCampo("a data de início do contrato"),
   mensalidade: moeda("mensalidade"),
   diaVencimento: numero("dia de vencimento", 1, 28),
+  plano: z.enum(["BASICO", "MEDIO", "PLUS"]).default("BASICO"),
   procuracaoStatus: z.enum(["PENDENTE", "ATIVA", "VENCIDA"]),
   procuracaoValidade: dataOpcional,
   observacoes: textoOpcional,

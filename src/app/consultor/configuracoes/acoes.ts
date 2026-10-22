@@ -100,3 +100,25 @@ export async function cadastrarWebhookInter(): Promise<EstadoAcao> {
     return erroParaEstado(e);
   }
 }
+
+export async function salvarPlanos(_: EstadoAcao, fd: FormData): Promise<EstadoAcao> {
+  const u = await exigirConsultor();
+  try {
+    const opcional = z.string().trim().transform((v) => (v ? v : null)).pipe(z.string().nullable());
+    const d = z.object({ precoBasico: opcional, precoMedio: opcional, precoPlus: opcional, diaVencimentoPlus: numero("o dia de vencimento do Plus", 1, 6), pagamentoDaeInter: checkbox }).parse(dadosDoForm(fd));
+    const valor = (v: string | null, rotulo: string) => {
+      if (v === null) return null;
+      const n = Number(v.replace(/\./g, "").replace(",", "."));
+      if (!Number.isFinite(n) || n < 0) throw new Error(`Valor inválido em ${rotulo}.`);
+      return n;
+    };
+    if (d.pagamentoDaeInter && !configInter().configurado) return { erro: "Para pagar o DAE pelo Inter, coloque antes as credenciais do Inter no .env." };
+    const dados = { precoBasico: valor(d.precoBasico, "Básico"), precoMedio: valor(d.precoMedio, "Médio"), precoPlus: valor(d.precoPlus, "Plus"), diaVencimentoPlus: Math.trunc(d.diaVencimentoPlus), pagamentoDaeInter: d.pagamentoDaeInter };
+    await prisma.configuracao.upsert({ where: { id: "principal" }, create: { id: "principal", ...dados }, update: dados });
+    await registrarAtividade({ usuarioId: u.id, acao: "CONFIGURACAO", descricao: "Planos e plano Plus alterados" });
+    revalidatePath("/consultor/configuracoes");
+    return { ok: true, mensagem: "Planos salvos." };
+  } catch (e) {
+    return erroParaEstado(e);
+  }
+}

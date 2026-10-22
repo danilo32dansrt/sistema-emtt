@@ -3,6 +3,7 @@ import { Formulario } from "@/components/Formulario";
 import { AreaTexto, Campo, Grade, Marcador, Selecao } from "@/components/ui";
 import { formatarNumero, isoData } from "@/lib/calculos";
 import { num } from "@/lib/conversao";
+import { PLANOS } from "@/lib/inter/plus";
 import { salvarCliente } from "./acoes";
 
 export function FormCliente({ cliente }: { cliente?: Cliente }) {
@@ -22,6 +23,7 @@ export function FormCliente({ cliente }: { cliente?: Cliente }) {
         </Grade>
         <Campo rotulo="Início do contrato de consultoria" name="inicioContrato" type="date" required defaultValue={isoData(cliente?.inicioContrato)} />
         <Grade>
+          <Selecao rotulo="Plano" name="plano" defaultValue={cliente?.plano ?? "BASICO"} opcoes={(Object.keys(PLANOS) as (keyof typeof PLANOS)[]).map((k) => ({ valor: k, rotulo: `${PLANOS[k].nome} — ${PLANOS[k].resumo}` }))} ajuda="No Plus a cobrança do mês junta mensalidade + DAE e a consultoria paga o DAE pelo cliente." />
           <Campo rotulo="Mensalidade (R$)" name="mensalidade" inputMode="decimal" required defaultValue={cliente ? formatarNumero(num(cliente.mensalidade)) : ""} />
           <Campo rotulo="Dia de vencimento" name="diaVencimento" type="number" min={1} max={28} required defaultValue={cliente?.diaVencimento ?? 10} />
         </Grade>

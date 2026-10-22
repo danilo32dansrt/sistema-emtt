@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Cartao, Celula, LinkBotao, Selo, Tabela, Titulo } from "@/components/ui";
 import { diferencaDias, formatarData, formatarMoeda, formatarTelefone, hojeBrasil, mascararCpf } from "@/lib/calculos";
 import { num } from "@/lib/conversao";
+import { PLANOS } from "@/lib/inter/plus";
 import { prisma } from "@/lib/db";
 
 export const metadata = { title: "Clientes" };
@@ -41,7 +42,7 @@ export default async function ListaClientes({ searchParams }: { searchParams: Pr
                 <Celula className="whitespace-nowrap">{mascararCpf(c.cpf)}</Celula>
                 <Celula className="whitespace-nowrap">{formatarTelefone(c.telefone)}</Celula>
                 <Celula>{c._count.empregados}</Celula>
-                <Celula className="whitespace-nowrap">{formatarMoeda(num(c.mensalidade))} · dia {c.diaVencimento}</Celula>
+                <Celula className="whitespace-nowrap">{formatarMoeda(num(c.mensalidade))} · dia {c.diaVencimento}<span className="block text-xs font-semibold text-marca-700">Plano {PLANOS[c.plano].nome}</span></Celula>
                 <Celula>
                   {vencida ? <Selo cor="vermelho">Vencida</Selo> : c.procuracaoStatus === "PENDENTE" ? <Selo cor="amarelo">Pendente</Selo> : <Selo cor={dias !== null && dias <= 30 ? "amarelo" : "verde"}>Ativa até {formatarData(c.procuracaoValidade)}</Selo>}
                 </Celula>

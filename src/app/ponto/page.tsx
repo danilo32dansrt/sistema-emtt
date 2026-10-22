@@ -1,5 +1,4 @@
 import { AtivarAvisos } from "@/components/AtivarAvisos";
-import { BotaoSOS } from "@/components/BotaoSOS";
 import { Pendencias } from "@/components/Pendencias";
 import { Aviso, Cartao } from "@/components/ui";
 import { exigirEmpregado } from "@/lib/auth/sessao";
@@ -61,7 +60,6 @@ export default async function PaginaPonto() {
         exigirLocalizacao={emp.exigirLocalizacao}
         marcacoesHoje={marcacoes.map((m) => ({ tipo: m.tipo, dataHora: m.dataHora.toISOString() }))}
       />
-      <BotaoSOS />
       <div className="mt-4"><AtivarAvisos chavePublica={await chavePublicaPush()} compacto /></div>
     </>
   );

@@ -126,7 +126,7 @@ valores em reais com 2 casas e datas dd/mm/aaaa.
   o layout abre por cima de tudo (`AlertaPendencias` + `TelaAlerta`) com os botões que resolvem; some quando tudo é
   resolvido. "Resolver depois" adia 1 hora (pendência nova reabre na hora); tocar num botão que leva a outra tela dá 10 min.
   As notificações com botão ficam fixas na tela do celular (`requireInteraction`).
-- **SOS da empregada:** botão vermelho no app do ponto, acionado segurando 2 s. Avisa na hora patrões e consultor
+- **SOS da empregada:** botão vermelho fixo no canto de todas as telas do app do ponto (acima do alerta de pendências), acionado segurando 2 s. Avisa na hora patrões e consultor
   (notificação urgente fixa + alerta vermelho de tela cheia sem "depois"), envia a localização e grava o áudio em trechos
   de 15 s (até 10 min) — `src/components/BotaoSOS.tsx`, `src/lib/servicos/emergencia.ts`, `/api/emergencia`,
   página `/emergencia/[id]`. "Estou indo" avisa a empregada; repete a cada execução da rotina de 10 min enquanto ninguém

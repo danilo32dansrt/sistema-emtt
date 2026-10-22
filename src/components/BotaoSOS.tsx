@@ -169,22 +169,25 @@ export function BotaoSOS() {
   }
 
   const graus = Math.round(progresso * 360);
+  // Fixo no canto, acima do menu de baixo: sempre à mão em qualquer tela do ponto (e acima do alerta de pendências)
   return (
-    <div className="my-4 flex flex-col items-center gap-1">
+    <div className="nao-imprimir fixed bottom-20 right-3 z-50 flex flex-col items-center">
+      {progresso > 0 && <p className="mb-1 rounded-full bg-red-700 px-3 py-1 text-xs font-bold text-white shadow">Continue segurando…</p>}
       <button
         type="button"
-        onPointerDown={segurar}
+        onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); segurar(); }}
         onPointerUp={soltar}
-        onPointerLeave={soltar}
         onPointerCancel={soltar}
         onContextMenu={(e) => e.preventDefault()}
-        className="flex h-24 w-24 touch-none select-none items-center justify-center rounded-full p-1.5"
+        className="flex h-[4.5rem] w-[4.5rem] touch-none select-none items-center justify-center rounded-full p-1 shadow-xl"
         style={{ background: `conic-gradient(#dc2626 ${graus}deg, #fecaca ${graus}deg)` }}
         aria-label="SOS — segure por 2 segundos para pedir ajuda"
       >
-        <span className="flex h-full w-full items-center justify-center rounded-full bg-red-600 text-2xl font-black text-white shadow-lg">SOS</span>
+        <span className="flex h-full w-full flex-col items-center justify-center rounded-full bg-red-600 font-black leading-none text-white">
+          <span className="text-xl">SOS</span>
+          <span className="text-[9px] font-semibold">segure 2s</span>
+        </span>
       </button>
-      <p className="text-center text-xs text-slate-600">{progresso > 0 ? "Continue segurando…" : "Emergência na casa? Segure 2 segundos."}</p>
     </div>
   );
 }

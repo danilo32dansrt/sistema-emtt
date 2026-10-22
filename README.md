@@ -122,7 +122,7 @@ e atrasado. Tudo fica também na tela **Avisos** de cada um.
 botões que resolvem (Aprovar, Trabalhou no horário, Pagar o DAE…). Ele só some quando tudo é resolvido; "Resolver depois"
 adia por 1 hora. No celular, as notificações com botão ficam fixas na tela até a pessoa tocar.
 
-**SOS (emergência na casa):** no app do ponto há um botão vermelho **SOS**. A empregada segura por 2 segundos (um toque
+**SOS (emergência na casa):** no app do ponto há um botão vermelho **SOS**, fixo no canto de todas as telas. A empregada segura por 2 segundos (um toque
 rápido não aciona) e na hora: os patrões e a consultoria recebem um alerta urgente (vibra forte e fica fixo na tela), com a
 localização; o celular dela começa a gravar o áudio (enviado a cada 15 segundos, por até 10 minutos) e mostra os botões
 para ligar 192, 193 e 190. Quem tocar em **Estou indo** faz aparecer na tela dela "Fulano está indo". Enquanto ninguém

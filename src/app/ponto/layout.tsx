@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { sair } from "@/app/login/acoes";
 import { AlertaPendencias } from "@/components/AlertaPendencias";
+import { BotaoSOS } from "@/components/BotaoSOS";
 import { exigirEmpregado } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
 import { pendenciasDaEmpregada } from "@/lib/servicos/lembretes";
@@ -33,6 +34,7 @@ export default async function LayoutPonto({ children }: { children: React.ReactN
       </header>
       <AlertaPendencias itens={pendencias} />
       <main className="px-4">{children}</main>
+      {u.consentimentoLgpdEm && <BotaoSOS />}
       <nav className="nao-imprimir fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white">
         <div className="mx-auto grid max-w-md grid-cols-5">
           {itens.map((i) => (

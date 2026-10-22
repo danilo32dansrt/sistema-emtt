@@ -5,7 +5,7 @@ import { erroParaEstado, type EstadoAcao } from "@/lib/acoes";
 import { registrarAtividade } from "@/lib/atividade";
 import { usuarioAtual, type UsuarioLogado } from "@/lib/auth/sessao";
 import {
-  DIAS_SEMANA, diaSemana, formatarCompetencia, formatarData, formatarMoeda, hojeBrasil, instantesDoDia, lerData, lerMoeda, marcacoesDoContrato,
+  addDias, DIAS_SEMANA, diaSemana, entradasPossiveis, formatarCompetencia, formatarData, formatarMoeda, hojeBrasil, instantesDoDia, lerData, lerMoeda, marcacoesDoContrato, saidaDaEscala,
 } from "@/lib/calculos";
 import { horariosDoEmpregado, jornadaDoEmpregado } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
@@ -105,6 +105,21 @@ export async function resolverPendencia(_: EstadoAcao, fd: FormData): Promise<Es
       await registrarAtividade({ usuarioId: u.id, clienteId: e.clienteId, acao: "LANCAMENTO_PONTO", descricao: `${u.nome} fechou o ponto de ${formatarCompetencia(ano, mes)} de ${e.nome}: ${resumoDoMes(esp)}${adiantamento ? ` Adiantamento ${formatarMoeda(adiantamento)}.` : ""}` });
       await avisarEmpregada(e.id, { chave: `fechado:${e.id}:${ano}-${mes}`, titulo: `Ponto de ${formatarCompetencia(ano, mes)} fechado`, texto: `${resumoDoMes(esp)} O espelho do mês está no app para você conferir e assinar.`, link: "/ponto/historico" });
       mensagem = `Mês fechado e enviado ao consultor: ${resumoDoMes(esp)}`;
+    } else if (tipo === "ESCALA") {
+      const e = await empregadoDoPatrao(u, campo(fd, "empregadoId"));
+      if (!e.horarioFlexivel) return { erro: "Este contrato não tem horário flexível." };
+      const data = lerData(campo(fd, "data"));
+      if (data < hojeBrasil() || data > addDias(hojeBrasil(), 7)) return { erro: "Escolha o horário de hoje até 7 dias à frente." };
+      const previsto = Math.round((jornadaDoEmpregado(e)[DIAS_SEMANA[diaSemana(data)]] ?? 0) * 60);
+      if (!previsto) return { erro: "Não há jornada prevista neste dia." };
+      const entrada = campo(fd, "entrada");
+      const deSempre = horariosDoEmpregado(e)?.[DIAS_SEMANA[diaSemana(data)]]?.entrada;
+      if (entrada !== deSempre && !entradasPossiveis(e.faixaInicio ?? "07:00", e.faixaFim ?? "19:00", previsto, e.acordoIntervaloReduzido).includes(entrada)) return { erro: "Horário fora da faixa do contrato." };
+      const saida = saidaDaEscala(entrada, previsto, e.acordoIntervaloReduzido);
+      await prisma.escalaDia.upsert({ where: { empregadoId_data: { empregadoId: e.id, data } }, create: { empregadoId: e.id, data, entrada, saida, definidoPorId: u.id }, update: { entrada, saida, automatica: false, definidoPorId: u.id } });
+      await registrarAtividade({ usuarioId: u.id, clienteId: e.clienteId, acao: "ESCALA", descricao: `Horário de ${e.nome} em ${formatarData(data)}: ${entrada} às ${saida}` });
+      await avisarEmpregada(e.id, { chave: `${e.id}:escala-aviso:${campo(fd, "data")}:${entrada}`, titulo: `${data.getTime() === hojeBrasil().getTime() ? "Hoje" : `Dia ${formatarData(data).slice(0, 5)}`} você entra às ${entrada}`, texto: `Entrada às ${entrada} e saída às ${saida}. Marque o ponto ao chegar.`, link: "/ponto", acao: "Ver o meu horário" });
+      mensagem = `Horário de ${formatarData(data)}: ${entrada} às ${saida}. A empregada foi avisada.`;
     } else if (tipo === "DAE_PAGO") {
       const c = await prisma.competencia.findUniqueOrThrow({ where: { id: campo(fd, "competenciaId") } });
       const e = await empregadoDoPatrao(u, c.empregadoId);

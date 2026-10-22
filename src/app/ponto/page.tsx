@@ -2,7 +2,8 @@ import { AtivarAvisos } from "@/components/AtivarAvisos";
 import { Pendencias } from "@/components/Pendencias";
 import { Aviso, Cartao } from "@/components/ui";
 import { exigirEmpregado } from "@/lib/auth/sessao";
-import { addDias, hojeBrasil } from "@/lib/calculos";
+import { addDias, DIAS_SEMANA, diaSemana, hojeBrasil } from "@/lib/calculos";
+import { horariosDoEmpregado, jornadaDoEmpregado } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
 import { chavePublicaPush } from "@/lib/notificacoes";
 import { pendenciasDaEmpregada } from "@/lib/servicos/lembretes";
@@ -36,11 +37,23 @@ export default async function PaginaPonto() {
     orderBy: { dataHora: "asc" },
     select: { tipo: true, dataHora: true },
   });
+  // Horário de hoje e de amanhã (escala do horário flexível ou o do contrato)
+  const escalas = await prisma.escalaDia.findMany({ where: { empregadoId: emp.id, data: { gte: hoje, lte: addDias(hoje, 1) } } });
+  const horarios = horariosDoEmpregado(emp);
+  const horarioDo = (d: Date) => {
+    const x = escalas.find((y) => y.data.getTime() === d.getTime());
+    const h = horarios?.[DIAS_SEMANA[diaSemana(d)]];
+    return x ? `${x.entrada} às ${x.saida}` : h && jornadaDoEmpregado(emp)[DIAS_SEMANA[diaSemana(d)]] ? `${h.entrada} às ${h.saida}` : "folga";
+  };
   // Pendências de dias anteriores (as de hoje se resolvem no próprio botão de marcar)
   const pendencias = (await pendenciasDaEmpregada(emp.id)).filter((p) => p.link !== "/ponto");
   return (
     <>
       <Pendencias itens={pendencias} titulo="Resolva o seu ponto" />
+      <div className="mb-3 flex justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+        <span>Hoje: <b>{horarioDo(hoje)}</b></span>
+        <span>Amanhã: <b>{horarioDo(addDias(hoje, 1))}</b></span>
+      </div>
       <RelogioPonto
         nome={emp.nome}
         exigirSelfie={emp.exigirSelfie}

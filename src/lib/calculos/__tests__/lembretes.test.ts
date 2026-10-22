@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { data, instanteLocal, instantesDoDia, intervaloMinimo, lembretesCobrancaPlus, lembretesFechamento, marcacaoQueFalta, marcacoesDoContrato, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, type DiaPonto } from "..";
+import { data, entradasPossiveis, instanteLocal, instantesDoDia, intervaloMinimo, lembretesEscala, saidaDaEscala, lembretesCobrancaPlus, lembretesFechamento, marcacaoQueFalta, marcacoesDoContrato, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, type DiaPonto } from "..";
 
 const qua = data(2026, 3, 4);
 const ter = data(2026, 3, 3);
@@ -145,5 +145,42 @@ describe("turno que passa da meia-noite", () => {
     const i = instantesDoDia(data(2026, 10, 20), ["22:00", "02:00", "03:00", "07:00"]);
     expect(i.map((x) => x.toISOString())).toEqual(["2026-10-21T01:00:00.000Z", "2026-10-21T05:00:00.000Z", "2026-10-21T06:00:00.000Z", "2026-10-21T10:00:00.000Z"]);
     expect(instantesDoDia(data(2026, 10, 20), ["08:00", "17:00"]).map((x) => x.toISOString())).toEqual(["2026-10-20T11:00:00.000Z", "2026-10-20T20:00:00.000Z"]);
+  });
+});
+
+describe("horário flexível e limites do dia", () => {
+  it("saída da escala e horários possíveis na faixa do contrato", () => {
+    expect(saidaDaEscala("10:00", 360)).toBe("16:15"); // 6h + 15 min de intervalo (jornada de 4h a 6h)
+    expect(saidaDaEscala("10:00", 264)).toBe("14:39");
+    expect(entradasPossiveis("07:00", "19:00", 360)).toEqual(["07:00", "08:00", "09:00", "10:00", "11:00", "12:00"]);
+  });
+
+  it("pergunta ao patrão à tarde, a cada hora, até ele escolher; depois avisa a empregada", () => {
+    const amanha = { data: data(2026, 3, 5), diaDeTrabalho: true, entrada: "08:00", saida: "12:24", definida: false };
+    const titulo = (h: string, a = amanha) => lembretesEscala({ agora: instanteLocal(qua, h), nome: "Maria Exemplo", amanha: a }).map((l) => `${l.para}:${l.titulo}`);
+    expect(titulo("15:00")).toEqual([]);
+    expect(titulo("17:10")).toEqual(["EMPREGADOR:Qual horário Maria entra amanhã (05/03)?"]);
+    expect(titulo("21:30")).toEqual([]);
+    expect(titulo("17:10", { ...amanha, entrada: "10:00", saida: "16:15", definida: true })).toEqual(["EMPREGADO:Amanhã (05/03) você entra às 10:00"]);
+  });
+
+  it("avisa 30 e 10 minutos antes da saída", () => {
+    const d = dia(qua, ["10:00"], { previstoMinutos: 360, entradaPrevista: "10:00", saidaPrevista: "16:15" });
+    expect(chaves("15:46", d)).toEqual(["EMPREGADO:saida-30"]);
+    expect(chaves("16:06", d)).toEqual(["EMPREGADO:saida-10"]);
+  });
+
+  it("tempo parcial com 6h no dia: não permite hora extra", () => {
+    const d = dia(qua, ["10:00", "13:00", "13:15"], { previstoMinutos: 360, entradaPrevista: "10:00", saidaPrevista: "16:15" });
+    const l = lembretesPonto({ agora: instanteLocal(qua, "16:35"), nome: "Maria", hoje: d, limiteExtraMinutos: 60, limiteDiaMinutos: 360, regraLimite: "tempo parcial: até 6h no dia" });
+    expect(l.find((x) => x.chave.startsWith("saida:"))!.texto).toContain("Hoje não é permitida hora extra");
+    expect(l.map((x) => x.chave.split(":")[0])).toContain("limite-patrao");
+  });
+
+  it("tempo parcial com 4h24: pode ficar até 1h a mais, com aviso 10 min antes do limite", () => {
+    const d = dia(qua, ["08:00", "10:10", "10:25"], { previstoMinutos: 264, entradaPrevista: "08:00", saidaPrevista: "12:39" });
+    const em = (h: string) => lembretesPonto({ agora: instanteLocal(qua, h), nome: "Maria", hoje: d, limiteExtraMinutos: 60, limiteDiaMinutos: 360 });
+    expect(em("12:55").find((x) => x.chave.startsWith("saida:"))!.texto).toContain("até no máximo 13:39");
+    expect(em("13:31").map((x) => x.chave.split(":")[0])).toContain("limite-10");
   });
 });

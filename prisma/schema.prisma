@@ -304,6 +304,10 @@ model Empregado {
   estabilidadeMotivo        String?
   pontoAtivo                Boolean           @default(false)
   exigirSelfie              Boolean           @default(false)
+  /// Horário flexível (previsto em contrato): o patrão escolhe a entrada de cada dia dentro da faixa
+  horarioFlexivel           Boolean           @default(false)
+  faixaInicio               String?
+  faixaFim                  String?
   exigirLocalizacao         Boolean           @default(true)
   observacoes               String?
   criadoEm                  DateTime          @default(now())
@@ -319,6 +323,7 @@ model Empregado {
   ajustes        AjustePonto[]
   justificativas Justificativa[]
   tratamentosDia TratamentoDia[]
+  escalas        EscalaDia[]
   espelhos       EspelhoPonto[]
   documentos     Documento[]
   ocorrencias    OcorrenciaDisciplinar[]
@@ -502,6 +507,23 @@ model Justificativa {
   criadoEm      DateTime          @default(now())
 
   @@index([empregadoId, data])
+}
+
+/// Horário flexível: entrada e saída de um dia, escolhidas pelo patrão (ou o horário de sempre, se ele não escolher).
+model EscalaDia {
+  id            String    @id @default(cuid())
+  empregadoId   String
+  empregado     Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  data          DateTime  @db.Date
+  entrada       String
+  saida         String
+  /// true quando o patrão não escolheu e valeu o horário de sempre
+  automatica    Boolean   @default(false)
+  definidoPorId String?
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+
+  @@unique([empregadoId, data])
 }
 
 /// Decisão do empregador sobre um dia com horas faltando (sem marcação ou incompleto): abonar, compensar ou descontar.

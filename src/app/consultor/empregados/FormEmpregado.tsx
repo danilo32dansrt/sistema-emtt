@@ -87,6 +87,11 @@ export function FormEmpregado({ empregado, clientes, clienteId }: { empregado?: 
       <h3 className="pt-2 font-semibold text-slate-800">Aplicativo de ponto</h3>
       <div className="grid gap-2 sm:grid-cols-3">
         <Marcador rotulo="Usar ponto eletrônico" name="pontoAtivo" defaultChecked={empregado?.pontoAtivo} />
+        <Marcador rotulo="Horário flexível (previsto no contrato): o patrão escolhe a entrada de cada dia dentro da faixa" name="horarioFlexivel" defaultChecked={empregado?.horarioFlexivel ?? false} />
+        <Grade>
+          <Campo rotulo="Faixa permitida — início" name="faixaInicio" type="time" defaultValue={empregado?.faixaInicio ?? "07:00"} ajuda="Ex.: só de dia, das 07:00…" />
+          <Campo rotulo="Faixa permitida — fim" name="faixaFim" type="time" defaultValue={empregado?.faixaFim ?? "19:00"} ajuda="…até as 19:00 (antes das 22h evita o adicional noturno)." />
+        </Grade>
         <Marcador rotulo="Exigir selfie na marcação (opcional — o padrão é o GPS da casa)" name="exigirSelfie" defaultChecked={empregado?.exigirSelfie ?? false} />
         <Marcador rotulo="Registrar localização na marcação" name="exigirLocalizacao" defaultChecked={empregado?.exigirLocalizacao ?? true} />
       </div>

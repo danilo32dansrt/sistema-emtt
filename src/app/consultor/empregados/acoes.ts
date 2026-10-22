@@ -42,6 +42,9 @@ const esquema = z.object({
   estabilidadeMotivo: textoOpcional,
   pontoAtivo: checkbox,
   exigirSelfie: checkbox,
+  horarioFlexivel: checkbox,
+  faixaInicio: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Faixa: use HH:MM.").optional().or(z.literal("")).transform((v) => v || null),
+  faixaFim: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Faixa: use HH:MM.").optional().or(z.literal("")).transform((v) => v || null),
   exigirLocalizacao: checkbox,
   observacoes: textoOpcional,
 });

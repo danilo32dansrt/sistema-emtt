@@ -36,6 +36,11 @@ export interface EntradaLembretesPonto {
   /** Dias anteriores ainda não resolvidos (os mais recentes primeiro). */
   anteriores?: DiaPonto[];
   acordoIntervaloReduzido?: boolean;
+  /** Limites do regime (tabela de parâmetros): hora extra máxima no dia e jornada máxima no dia, em minutos. */
+  limiteExtraMinutos?: number;
+  limiteDiaMinutos?: number;
+  /** Texto curto da regra do limite, ex.: "tempo parcial: até 1h extra e 6h no dia". */
+  regraLimite?: string;
   /** De quanto em quanto tempo o lembrete se repete enquanto a pendência continuar (minutos). */
   repetirMinutos?: number;
   /** Faixa de horário para lembrar pendências de dias anteriores e pedidos (não incomoda de madrugada). */
@@ -97,10 +102,30 @@ export function lembretesPonto(e: EntradaLembretesPonto): Lembrete[] {
     if (n === 2 && intervalo > 0 && desde(ordenadas[1]) >= intervalo + 10 && (saida === null || (agora < saida && partesLocais(ordenadas[1]).minutos < saida - 30))) {
       add("retorno", "EMPREGADO", "A volta do intervalo ainda não foi lançada", "Marque a volta do intervalo. Se voltou antes e esqueceu, peça o ajuste com o horário certo.", "/ponto", "Marcar volta agora");
     }
-    // Saída não lançada (até o fim do dia; depois vira pendência do dia anterior)
+    // Perto da saída: avisa com 30 e com 10 minutos de antecedência (uma vez cada)
+    const uma = (tipo: string, para: Destinatario, titulo: string, texto: string, acao: string) => lista.push({ chave: `${tipo}:${d}`, para, titulo, texto, link: "/ponto", acao });
+    if (n % 2 === 1 && saida !== null) {
+      if (agora >= saida - 30 && agora < saida - 25) uma("saida-30", "EMPREGADO", "Faltam 30 minutos para a sua saída", `Sua saída é às ${h.saidaPrevista}. Adiante o que falta para sair no horário.`, "Abrir o ponto");
+      if (agora >= saida - 10 && agora < saida - 5) uma("saida-10", "EMPREGADO", "Faltam 10 minutos para a sua saída", `Sua saída é às ${h.saidaPrevista}. Não esqueça de marcar a saída.`, "Abrir o ponto");
+    }
+    // Saída não lançada (até o fim do dia; depois vira pendência do dia anterior), com o limite de horas do regime
     const passouDaSaida = saida !== null ? agora >= saida + 15 : n > 0 && desde(ordenadas[0]) >= h.previstoMinutos + intervalo + 30;
     if (n % 2 === 1 && passouDaSaida && agora < 24 * 60) {
-      add("saida", "EMPREGADO", "A saída de hoje ainda não foi lançada", `Já terminou o dia? Marque a saída${h.saidaPrevista ? ` (horário previsto: ${h.saidaPrevista})` : ""}. Se saiu e esqueceu, peça o ajuste com o horário correto.`, "/ponto", "Marcar saída agora");
+      let trabalhado = 0;
+      for (let i = 0; i < ordenadas.length; i += 2) trabalhado += ((ordenadas[i + 1]?.getTime() ?? e.agora.getTime()) - ordenadas[i].getTime()) / 60_000;
+      const regra = e.regraLimite ? ` (${e.regraLimite})` : "";
+      let limiteTxt = "";
+      if (e.limiteDiaMinutos !== undefined && saida !== null) {
+        const fimExtra = saida + (e.limiteExtraMinutos ?? 0);
+        const fimDia = agora + (e.limiteDiaMinutos - trabalhado);
+        const fim = Math.min(fimExtra, fimDia);
+        if (fim <= saida) limiteTxt = ` Hoje não é permitida hora extra${regra}: marque a saída agora.`;
+        else if (agora >= fim) limiteTxt = ` Você passou do limite permitido${regra}: marque a saída agora.`;
+        else limiteTxt = ` Se precisar ficar, conta como hora extra até no máximo ${hhmm(fim)}${regra}.`;
+        if (agora >= fim - 10 && agora < fim && fim > saida) uma("limite-10", "EMPREGADO", "Em 10 minutos você chega ao limite de horas", `O máximo hoje é até ${hhmm(fim)}${regra}. Marque a saída.`, "Marcar saída agora");
+        if (agora >= fim) uma("limite-patrao", "EMPREGADOR", `${nome} passou do limite de horas de hoje`, `A saída prevista era ${h.saidaPrevista} e o limite do regime${regra} já foi atingido. Peça para ela marcar a saída.`, "Ver o ponto de hoje");
+      }
+      add("saida", "EMPREGADO", "A saída de hoje ainda não foi lançada", `Já terminou o dia? Marque a saída${h.saidaPrevista ? ` (horário previsto: ${h.saidaPrevista})` : ""}.${limiteTxt || " Se saiu e esqueceu, peça o ajuste com o horário correto."}`, "/ponto", "Marcar saída agora");
     }
   }
 
@@ -281,4 +306,39 @@ export function instantesDoDia(dia: Date, horas: string[]): Date[] {
     anterior = m;
     return instanteLocal(new Date(dia.getTime() + extra * 86_400_000), h);
   });
+}
+
+/** Saída do dia a partir da entrada escolhida: entrada + jornada do dia + intervalo obrigatório. */
+export function saidaDaEscala(entrada: string, previstoMinutos: number, acordoIntervaloReduzido = false): string {
+  return hhmm(horaParaMinutos(entrada) + previstoMinutos + intervaloMinimo(previstoMinutos, acordoIntervaloReduzido));
+}
+
+/** Horários de entrada possíveis na faixa do contrato (de hora em hora), sem passar do fim da faixa. */
+export function entradasPossiveis(janelaInicio: string, janelaFim: string, previstoMinutos: number, acordoIntervaloReduzido = false): string[] {
+  const ini = horaParaMinutos(janelaInicio);
+  const fim = horaParaMinutos(janelaFim);
+  const duracao = previstoMinutos + intervaloMinimo(previstoMinutos, acordoIntervaloReduzido);
+  const lista: string[] = [];
+  for (let m = Math.ceil(ini / 60) * 60; m + duracao <= fim; m += 60) lista.push(hhmm(m));
+  return lista;
+}
+
+/**
+ * Horário flexível (escala do dia seguinte): à tarde pergunta ao patrão o horário de amanhã (a cada hora até ele
+ * responder) e, quando definido, avisa a empregada uma vez.
+ */
+export function lembretesEscala(e: { agora: Date; nome: string; amanha: { data: Date; diaDeTrabalho: boolean; entrada?: string; saida?: string; definida: boolean }; perguntarDe?: number; perguntarAte?: number; repetirMinutos?: number }): Lembrete[] {
+  const local = partesLocais(e.agora);
+  const a = e.amanha;
+  if (!a.diaDeTrabalho) return [];
+  const dia = formatarData(a.data).slice(0, 5);
+  const d = iso(a.data);
+  const de = e.perguntarDe ?? 17 * 60;
+  const ate = e.perguntarAte ?? 21 * 60;
+  if (!a.definida) {
+    if (local.minutos < de || local.minutos >= ate) return [];
+    return [{ chave: `escala-pergunta:${d}:${janela(e.agora, e.repetirMinutos ?? 60)}`, para: "EMPREGADOR", titulo: `Qual horário ${primeiroNome(e.nome)} entra amanhã (${dia})?`, texto: `Escolha num toque. Se não escolher até as ${hhmm(ate)}, vale o horário de sempre${a.entrada ? ` (${a.entrada})` : ""}.`, link: "/cliente", acao: "Definir o horário" }];
+  }
+  if (local.minutos < de) return [];
+  return [{ chave: `escala-aviso:${d}:${a.entrada}`, para: "EMPREGADO", titulo: `Amanhã (${dia}) você entra às ${a.entrada}`, texto: `Entrada às ${a.entrada} e saída às ${a.saida}. Marque o ponto ao chegar.`, link: "/ponto", acao: "Ver o meu horário" }];
 }

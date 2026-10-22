@@ -1,14 +1,14 @@
 import "server-only";
-import type { Afastamento, Empregado, Ferias, Justificativa, TratamentoDia } from "@prisma/client";
+import type { Afastamento, Empregado, EscalaDia, Ferias, Justificativa, TratamentoDia } from "@prisma/client";
 import {
   addDias, agruparJornadas, competenciaAnterior, DIAS_SEMANA, diaSemana, diferencaDias, ehDiaDeTrabalho12x36, ehFeriado, formatarCompetencia, formatarData, formatarMoeda,
-  hojeBrasil, lembretesCobrancaPlus, lembretesConsultor, lembretesDae, lembretesFechamento, lembretesPedidosPendentes, lembretesPonto, marcacaoQueFalta, partesLocais,
+  entradasPossiveis, hojeBrasil, lembretesCobrancaPlus, lembretesEscala, parametrosJornada, saidaDaEscala, lembretesConsultor, lembretesDae, lembretesFechamento, lembretesPedidosPendentes, lembretesPonto, marcacaoQueFalta, partesLocais,
   situacaoChecklist, ultimoDiaMes, vencimentoDae, type DiaPonto, type Lembrete,
 } from "@/lib/calculos";
 import { horariosDoEmpregado, jornadaDoEmpregado, num } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
 import { notificar } from "@/lib/notificacoes";
-import { configuracao } from "@/lib/tabelas-db";
+import { configuracao, registrosParametros } from "@/lib/tabelas-db";
 import { situacaoParametros } from "./parametros";
 import { espelhoDoMes, resumoDoMes } from "./ponto";
 
@@ -18,13 +18,14 @@ const DIAS_PENDENCIA = 3;
 /** Instante UTC do início do dia local (Brasília) — o dia local começa às 03:00 UTC. */
 const inicioLocal = (d: Date) => new Date(d.getTime() + 3 * 3600_000);
 
-type EmpregadoCompleto = Empregado & { ferias: Ferias[]; afastamentos: Afastamento[]; justificativas: Justificativa[]; tratamentosDia: TratamentoDia[] };
+type EmpregadoCompleto = Empregado & { ferias: Ferias[]; afastamentos: Afastamento[]; justificativas: Justificativa[]; tratamentosDia: TratamentoDia[]; escalas: EscalaDia[] };
 
 const incluirDias = (de: Date, hoje: Date) => ({
   ferias: { where: { inicioGozo: { lte: hoje } } },
   afastamentos: { where: { inicio: { lte: hoje }, OR: [{ fim: null }, { fim: { gte: de } }] } },
   justificativas: { where: { status: { in: ["APROVADO" as const, "PENDENTE" as const] }, data: { lte: hoje }, OR: [{ dataFim: null, data: { gte: de } }, { dataFim: { gte: de } }] } },
   tratamentosDia: { where: { data: { gte: de, lte: hoje } } },
+  escalas: { where: { data: { gte: de, lte: addDias(hoje, 1) } } },
 });
 
 /** Monta os dias (hoje e os anteriores) com o previsto do contrato e as marcações, para as regras de lembrete. */
@@ -51,19 +52,29 @@ async function diasDoEmpregado(e: EmpregadoCompleto, hoje: Date) {
       data: d,
       diaDeTrabalho: e.pontoAtivo && previsto > 0 && !fora && !deFerias && !afastado && !justificado && (e.regime === "DOZE_X_TRINTA_SEIS" || !ehFeriado(d)),
       previstoMinutos: previsto,
-      entradaPrevista: horarios?.[ds]?.entrada,
-      saidaPrevista: horarios?.[ds]?.saida,
+      // Horário flexível: vale a escala escolhida para o dia; senão, o horário do contrato
+      entradaPrevista: e.escalas.find((x) => x.data.getTime() === d.getTime())?.entrada ?? horarios?.[ds]?.entrada,
+      saidaPrevista: e.escalas.find((x) => x.data.getTime() === d.getTime())?.saida ?? horarios?.[ds]?.saida,
       // A jornada pertence ao dia em que começou (turno da noite termina no dia seguinte)
       marcacoes: jornadas.find((j) => j.data.getTime() === d.getTime())?.marcacoes ?? [],
     };
   };
-  return { hoje: montar(hoje), anteriores: Array.from({ length: DIAS_PENDENCIA }, (_, i) => montar(addDias(hoje, -(i + 1)))) };
+  return { hoje: montar(hoje), amanha: montar(addDias(hoje, 1)), anteriores: Array.from({ length: DIAS_PENDENCIA }, (_, i) => montar(addDias(hoje, -(i + 1)))) };
 }
 
 /** Pendências do ponto deste momento (para lembretes e para os botões na tela). */
+/** Limites do regime no dia (tabela de parâmetros), para os avisos de hora extra e de jornada máxima. */
+async function limitesDoRegime(e: Empregado, data: Date) {
+  const L = parametrosJornada(await registrosParametros(), data);
+  if (e.regime === "PARCIAL") return { limiteExtraMinutos: L.parcialExtraDiaria * 60, limiteDiaMinutos: L.parcialDiariaMax * 60, regraLimite: `tempo parcial: até ${L.parcialExtraDiaria}h extra e ${L.parcialDiariaMax}h no dia` };
+  if (e.regime === "DOZE_X_TRINTA_SEIS") return { limiteExtraMinutos: 0, limiteDiaMinutos: L.doze36Max * 60, regraLimite: `escala 12x36: até ${L.doze36Max}h` };
+  return { limiteExtraMinutos: 120, limiteDiaMinutos: L.limiteDiario * 60, regraLimite: `até ${L.limiteDiario}h no dia` };
+}
+
 async function lembretesDoEmpregado(e: EmpregadoCompleto, agora: Date, paraTela = false): Promise<Lembrete[]> {
-  const dias = await diasDoEmpregado(e, partesLocais(agora).data);
-  return lembretesPonto({ agora, nome: e.nome, ...dias, acordoIntervaloReduzido: e.acordoIntervaloReduzido, horarioComercial: paraTela ? { inicio: 0, fim: 24 * 60 } : undefined });
+  const { amanha: _amanha, ...dias } = await diasDoEmpregado(e, partesLocais(agora).data);
+  void _amanha;
+  return lembretesPonto({ agora, nome: e.nome, ...dias, ...(await limitesDoRegime(e, dias.hoje.data)), acordoIntervaloReduzido: e.acordoIntervaloReduzido, horarioComercial: paraTela ? { inicio: 0, fim: 24 * 60 } : undefined });
 }
 
 /** Uma pendência por tipo (sem a parte da chave que controla a repetição) — para mostrar na tela. */
@@ -104,11 +115,11 @@ export type PendenciaPatrao = PendenciaComAcoes;
 /** Pendências do ponto deste momento já com os botões que resolvem cada uma. */
 async function pendenciasPontoNaTela(e: EmpregadoCompleto, agora: Date, para: "EMPREGADO" | "EMPREGADOR"): Promise<PendenciaComAcoes[]> {
   const dias = await diasDoEmpregado(e, partesLocais(agora).data);
-  const lista = paraTela(lembretesPonto({ agora, nome: e.nome, ...dias, acordoIntervaloReduzido: e.acordoIntervaloReduzido, horarioComercial: { inicio: 0, fim: 24 * 60 } }), para);
+  const lista = paraTela(lembretesPonto({ agora, nome: e.nome, hoje: dias.hoje, anteriores: dias.anteriores, ...(await limitesDoRegime(e, dias.hoje.data)), acordoIntervaloReduzido: e.acordoIntervaloReduzido, horarioComercial: { inicio: 0, fim: 24 * 60 } }), para);
   const todos = [dias.hoje, ...dias.anteriores];
   const compensa = e.regime === "INTEGRAL" && e.acordoCompensacao;
   const nome = e.nome.split(" ")[0];
-  return lista.map((l) => {
+  const itens: PendenciaComAcoes[] = lista.map((l) => {
     const [tipo, diaIso] = l.chave.split(":");
     const dia = todos.find((d) => d.data.toISOString().slice(0, 10) === diaIso);
     const base = { empregadoId: e.id, data: diaIso };
@@ -142,6 +153,27 @@ async function pendenciasPontoNaTela(e: EmpregadoCompleto, agora: Date, para: "E
     }
     return { ...l, chave: `${e.id}:${l.chave}`, opcoes: opcoes.length ? opcoes : undefined };
   });
+  // Horário flexível: escolher num toque o horário de amanhã (para o patrão)
+  const escolha = para === "EMPREGADOR" ? opcoesEscala(e, dias.amanha) : null;
+  return escolha ? [escolha, ...itens] : itens;
+}
+
+/** Pergunta "qual horário amanhã?" com um botão por horário possível dentro da faixa do contrato. */
+function opcoesEscala(e: EmpregadoCompleto, amanha: DiaPonto): PendenciaComAcoes | null {
+  if (!e.horarioFlexivel || !amanha.diaDeTrabalho || !amanha.previstoMinutos) return null;
+  if (e.escalas.some((x) => x.data.getTime() === amanha.data.getTime())) return null;
+  const data = amanha.data.toISOString().slice(0, 10);
+  const horas = entradasPossiveis(e.faixaInicio ?? "07:00", e.faixaFim ?? "19:00", amanha.previstoMinutos, e.acordoIntervaloReduzido);
+  const deSempre = amanha.entradaPrevista;
+  const lista = deSempre && !horas.includes(deSempre) ? [deSempre, ...horas] : horas;
+  if (!lista.length) return null;
+  const nome = e.nome.split(" ")[0];
+  return {
+    chave: `${e.id}:escala:${data}`, para: "EMPREGADOR", link: "/cliente", acao: "Ver o ponto", urgente: false,
+    titulo: `Qual horário ${nome} entra amanhã (${formatarData(amanha.data).slice(0, 5)})?`,
+    texto: `Jornada de ${(amanha.previstoMinutos / 60).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}h. Escolha a entrada; a saída é calculada sozinha. Sem escolha até as 21h, vale o horário de sempre${deSempre ? ` (${deSempre})` : ""}.`,
+    opcoes: lista.map((h) => ({ rotulo: `${h} às ${saidaDaEscala(h, amanha.previstoMinutos, e.acordoIntervaloReduzido)}${h === deSempre ? " (o de sempre)" : ""}`, tipo: "ESCALA", dados: { empregadoId: e.id, data, entrada: h }, estilo: h === deSempre ? ("sucesso" as const) : ("secundario" as const) })),
+  };
 }
 
 /** Botões de pendência na tela da empregada. */
@@ -275,6 +307,23 @@ export async function rodarLembretesPonto(agora = new Date()) {
   const empregados = await buscarEmpregados({ OR: [{ desligamento: null }, { desligamento: { gte: addDias(hoje, -DIAS_PENDENCIA) } }] }, hoje);
   let enviados = 0;
   for (const e of empregados) {
+    // Horário flexível: pergunta ao patrão o horário de amanhã; às 21h, sem resposta, vale o horário de sempre
+    if (e.horarioFlexivel) {
+      const { amanha } = await diasDoEmpregado(e, hoje);
+      const definida = e.escalas.find((x) => x.data.getTime() === amanha.data.getTime());
+      if (!definida && amanha.diaDeTrabalho && amanha.entradaPrevista && amanha.previstoMinutos && partesLocais(agora).minutos >= 21 * 60) {
+        const saida = saidaDaEscala(amanha.entradaPrevista, amanha.previstoMinutos, e.acordoIntervaloReduzido);
+        e.escalas.push(await prisma.escalaDia.create({ data: { empregadoId: e.id, data: amanha.data, entrada: amanha.entradaPrevista, saida, automatica: true } }));
+        amanha.saidaPrevista = saida;
+      }
+      const def = e.escalas.find((x) => x.data.getTime() === amanha.data.getTime());
+      for (const l of lembretesEscala({ agora, nome: e.nome, amanha: { data: amanha.data, diaDeTrabalho: amanha.diaDeTrabalho, entrada: def?.entrada ?? amanha.entradaPrevista, saida: def?.saida ?? amanha.saidaPrevista, definida: Boolean(def) } })) {
+        const aviso = { chave: `${e.id}:${l.chave}`, titulo: l.titulo, texto: l.texto, link: l.link, acao: l.acao };
+        if (l.para === "EMPREGADO") {
+          if (e.usuario?.ativo && (await notificar(e.usuario.id, aviso))) enviados++;
+        } else for (const u of e.cliente.usuarios) if (await notificar(u.id, aviso)) enviados++;
+      }
+    }
     for (const l of await lembretesDoEmpregado(e, agora)) {
       const aviso = { chave: `${e.id}:${l.chave}`, titulo: l.titulo, texto: l.texto, link: l.link, acao: l.acao };
       if (l.para === "EMPREGADO") {

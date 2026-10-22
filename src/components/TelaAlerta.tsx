@@ -44,7 +44,6 @@ export function TelaAlerta({ chaves, urgente, total, children }: { chaves: strin
     const abrir = chaves.length > 0 && !adiado;
     setAberto(abrir);
     setTocando(abrir);
-    if (abrir) navigator.vibrate?.(urgente ? [600, 200, 600, 200, 600] : [200, 100, 200]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assinatura, urgente]);
 

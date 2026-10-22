@@ -1,6 +1,6 @@
 /* Service worker do aplicativo de ponto: permite abrir o app sem internet.
    As marcações offline ficam guardadas no aparelho e são enviadas pelo app quando a conexão volta. */
-const VERSAO = "ponto-v4";
+const VERSAO = "ponto-v5";
 const ESSENCIAIS = ["/ponto", "/ponto/historico", "/ponto/justificativas", "/manifest.webmanifest", "/icone.svg"];
 
 self.addEventListener("install", (evento) => {
@@ -66,7 +66,8 @@ self.addEventListener("push", (evento) => {
       // Pendência (tem botão que resolve) e SOS ficam fixos na tela até a pessoa tocar
       requireInteraction: Boolean(dados.urgente || dados.acao),
       silent: false,
-      vibrate: dados.urgente ? [600, 200, 600, 200, 600, 200, 600] : [200, 100, 200],
+      // Vibração forte e longa no SOS; firme nas pendências (o celular também toca o som de notificação)
+      vibrate: dados.urgente ? [1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000] : [500, 200, 500, 200, 500],
       actions: dados.acao ? [{ action: "abrir", title: dados.acao }] : [],
       data: { link: dados.link || "/", sos: dados.urgente && /^\/emergencia\/[\w-]+$/.test(dados.link || "") ? dados.link.split("/")[2] : null },
     }),

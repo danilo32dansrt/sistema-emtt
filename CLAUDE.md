@@ -131,7 +131,7 @@ valores em reais com 2 casas e datas dd/mm/aaaa.
   de 15 s (até 10 min) — `src/components/BotaoSOS.tsx`, `src/lib/servicos/emergencia.ts`, `/api/emergencia`,
   página `/emergencia/[id]`. "Estou indo" avisa a empregada; repete a cada execução da rotina de 10 min enquanto ninguém
   responde, e a cada trecho de áudio (~30 s) o celular de patrões e consultor toca de novo (`insistirNoSos`, sem poluir a
-  lista de avisos). **Som até apertar um botão (pedido do dono):** no app aberto, sirene contínua no SOS e "plim" a cada
+  lista de avisos). **Som até apertar um botão (pedido do dono):** no app aberto, sirene + vibração contínuas no SOS e "plim" + vibração a cada
   20 s nas pendências (`src/components/som.ts`, `TelaAlerta`); "Estou indo" direto na notificação responde pela rota
   `/api/emergencia/[id]/atender` (o service worker chama antes de abrir o app). LGPD: microfone só durante o SOS (proteção da vida, art. 7º, VII), texto no aviso de privacidade.
 - eSocial: versão inicial gera o resumo de rubricas para lançamento manual; webservice direto é estudo futuro.

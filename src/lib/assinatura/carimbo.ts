@@ -6,8 +6,17 @@
  * tamanho de tela. A posição é só visual: não muda o arquivo original nem o hash assinado.
  */
 
-/** Tamanho fixo do carimbo, em pontos de PDF (1 pt = 1/72 pol.): cerca de 6,4 cm × 1,5 cm. */
-export const CARIMBO = { largura: 182, altura: 42 } as const;
+/** Tamanho fixo do carimbo, em pontos de PDF (1 pt = 1/72 pol.): cerca de 7,6 cm × 1,5 cm (QR Code + 5 linhas). */
+export const CARIMBO = { largura: 216, altura: 42 } as const;
+
+/** Linhas do carimbo, no modelo aprovado: tamanho (pt), negrito e espaço extra depois (pt). Fonte Times. */
+export const ESTILO_LINHAS: { tamanho: number; negrito: boolean; depois: number }[] = [
+  { tamanho: 8.2, negrito: false, depois: 2.5 },
+  { tamanho: 9.4, negrito: true, depois: 0 },
+  { tamanho: 6.8, negrito: true, depois: 0 },
+  { tamanho: 4.5, negrito: false, depois: 0 },
+  { tamanho: 5.6, negrito: false, depois: 0 },
+];
 
 export type PapelSignatario = "CLIENTE" | "EMPREGADO" | "CONSULTOR";
 
@@ -89,19 +98,23 @@ export interface DadosCarimbo {
   /** Data da assinatura; sem data, o carimbo é só a prévia do lugar. */
   data?: Date | null;
   codigo: string;
-  /** Endereço do sistema (APP_URL), para a linha "Verifique em". */
+  /** Endereço do sistema (APP_URL), para a linha "Verifique em" e o QR Code. */
   endereco?: string;
 }
 
-/** Texto do carimbo, linha a linha (a 1ª e a 2ª saem em negrito). */
+/** Endereço de verificação impresso no carimbo e gravado no QR Code: <sistema>/verificar/<código>. */
+export function enderecoVerificacao(d: Pick<DadosCarimbo, "codigo" | "endereco">): string {
+  return `${(d.endereco ?? "").replace(/\/$/, "")}/verificar/${d.codigo}`;
+}
+
+/** Texto do carimbo, linha a linha (estilo de cada linha em ESTILO_LINHAS). */
 export function linhasCarimbo(d: DadosCarimbo): string[] {
-  const base = (d.endereco ?? "").replace(/\/$/, "");
   return [
     d.data ? "Documento assinado digitalmente" : "Assinatura digital (prévia do lugar)",
     d.nome.toUpperCase(),
     d.data ? `Data: ${dataHoraCarimbo(d.data)}` : "Data: após a assinatura",
-    `Verifique em ${base ? `${base.replace(/^https?:\/\//, "")}/verificar` : "/verificar"}`,
-    `Código: ${d.codigo}`,
+    "art. 4º, I, da Lei nº 14.063/2020 e art. 10, § 2º, da MP nº 2.200-2/2001, com login e senha do signatário.",
+    `Verifique em ${enderecoVerificacao(d)}`,
   ];
 }
 

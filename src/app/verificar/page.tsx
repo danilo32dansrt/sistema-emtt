@@ -17,7 +17,7 @@ export default async function VerificarPage({ searchParams }: { searchParams: Pr
     <main className="mx-auto max-w-2xl space-y-4 p-4 sm:p-8">
       <h1 className="text-2xl font-bold text-slate-900">Verificar assinatura de documento</h1>
       <form className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1"><Campo rotulo="Código de verificação (impresso no carimbo)" name="codigo" defaultValue={codigo} required /></div>
+        <div className="flex-1"><Campo rotulo="Código de verificação (o final do endereço impresso no carimbo)" name="codigo" defaultValue={codigo} required /></div>
         <button className="min-h-12 rounded-xl bg-marca-600 px-5 font-semibold text-white">Verificar</button>
       </form>
       {codigo && !doc && <Aviso tipo="critico">Nenhum documento encontrado com este código.</Aviso>}

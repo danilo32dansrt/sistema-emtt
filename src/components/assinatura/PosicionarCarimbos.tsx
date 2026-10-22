@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as EventoPonteiro } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as EventoPonteiro } from "react";
 import { salvarPosicaoCarimbo } from "@/app/acoes-documentos";
-import { CARIMBO, limitarPosicao, linhasCarimbo, type PosicaoCarimbo, type TamanhoPagina } from "@/lib/assinatura/carimbo";
+import { CARIMBO, enderecoVerificacao, ESTILO_LINHAS, limitarPosicao, linhasCarimbo, type PosicaoCarimbo, type TamanhoPagina } from "@/lib/assinatura/carimbo";
+import { matrizQr } from "@/lib/assinatura/qr";
 import { Aviso, Botao } from "../ui";
 
 export interface CarimboTela {
@@ -20,16 +21,18 @@ const ESPACO = 12;
 
 /** Prévia do carimbo, no mesmo desenho do PDF (escala = pixels por ponto de PDF). */
 export function CarimboPrevia({ nome, data, codigo, endereco, escala }: { nome: string; data: string | null; codigo: string; endereco?: string; escala: number }) {
-  const linhas = linhasCarimbo({ nome, data: data ? new Date(data) : null, codigo, endereco });
-  const tam = [6.2, 6.8, 5.8, 5.8, 5.8];
+  const dados = { nome, data: data ? new Date(data) : null, codigo, endereco };
+  const linhas = linhasCarimbo(dados);
+  const qr = useMemo(() => matrizQr(enderecoVerificacao(dados)), [codigo, endereco]); // eslint-disable-line react-hooks/exhaustive-deps
+  const caminho = qr.flatMap((l, y) => l.map((p, x) => (p ? `M${x} ${y}h1v1h-1z` : ""))).join("");
   return (
-    <div className="flex h-full w-full items-center bg-white/90" style={{ gap: 4 * escala, paddingLeft: 3 * escala }}>
-      <span className="flex shrink-0 items-center justify-center rounded-full border-emerald-700 font-bold text-emerald-700" style={{ width: 24 * escala, height: 24 * escala, borderWidth: 1.4 * escala, fontSize: 13 * escala }} aria-hidden>
-        ✓
-      </span>
-      <span className="min-w-0 leading-tight" style={{ paddingLeft: 2 * escala }}>
+    <div className="flex h-full w-full items-center bg-white/90 text-neutral-900" style={{ gap: 4 * escala, fontFamily: "'Times New Roman', Times, serif" }}>
+      <svg viewBox={`0 0 ${qr.length} ${qr.length}`} shapeRendering="crispEdges" className="shrink-0" style={{ width: CARIMBO.altura * escala, height: CARIMBO.altura * escala }} aria-hidden>
+        <path d={caminho} fill="currentColor" />
+      </svg>
+      <span className="min-w-0 flex-1">
         {linhas.map((l, i) => (
-          <span key={i} className={i < 2 ? "block truncate font-bold text-slate-900" : "block truncate text-slate-500"} style={{ fontSize: tam[i] * escala, lineHeight: 1.18 }}>
+          <span key={i} className="block overflow-hidden whitespace-nowrap" style={{ fontSize: ESTILO_LINHAS[i].tamanho * escala, fontWeight: ESTILO_LINHAS[i].negrito ? 700 : 400, lineHeight: 1.08, marginBottom: ESTILO_LINHAS[i].depois * escala }}>
             {l}
           </span>
         ))}

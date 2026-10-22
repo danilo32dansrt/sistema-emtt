@@ -1,12 +1,12 @@
 import { PDFDocument, PDFFont, PDFHexString, PDFName, PDFPage, PDFString, rgb, StandardFonts } from "pdf-lib";
 import {
-  CARIMBO, emPontos, linhasCarimbo, posicoesDosCarimbos,
+  CARIMBO, emPontos, enderecoVerificacao, ESTILO_LINHAS, linhasCarimbo, posicoesDosCarimbos,
   type DadosCarimbo, type LocalAssinatura, type PapelSignatario, type PosicaoCarimbo, type TamanhoPagina,
 } from "@/lib/assinatura/carimbo";
+import { matrizQr } from "@/lib/assinatura/qr";
 import { CHAVE_LOCAIS, propriedadesPdf, textoSeguro } from "./base";
 
-const AZUL = rgb(0.08, 0.13, 0.24);
-const VERDE = rgb(0.09, 0.45, 0.25);
+const PRETO = rgb(0.07, 0.07, 0.07);
 const CINZA = rgb(0.45, 0.45, 0.45);
 
 /** Linhas de assinatura gravadas no PDF ao ser gerado (documentos antigos não têm: lista vazia). */
@@ -33,24 +33,28 @@ function cortar(t: string, fonte: PDFFont, tamanho: number, largura: number) {
   return s;
 }
 
-/** Desenha o carimbo (selo com visto + 5 linhas de texto) com o canto inferior esquerdo em (x, y). */
+/** Desenha o carimbo (QR Code + 5 linhas em Times, no modelo aprovado) com o canto inferior esquerdo em (x, y). */
 export function desenharCarimbo(pagina: PDFPage, fontes: { normal: PDFFont; negrito: PDFFont }, x: number, y: number, dados: DadosCarimbo) {
   const { largura: L, altura: A } = CARIMBO;
   pagina.drawRectangle({ x, y, width: L, height: A, color: rgb(1, 1, 1), opacity: 0.92 });
-  const cx = x + 15;
-  const cy = y + A / 2;
-  pagina.drawCircle({ x: cx, y: cy, size: 12, borderColor: VERDE, borderWidth: 1.4 });
-  pagina.drawLine({ start: { x: cx - 5.5, y: cy + 0.5 }, end: { x: cx - 1.5, y: cy - 4 }, thickness: 1.8, color: VERDE });
-  pagina.drawLine({ start: { x: cx - 1.5, y: cy - 4 }, end: { x: cx + 6, y: cy + 5 }, thickness: 1.8, color: VERDE });
-  const tx = x + 32;
-  const lt = L - 34;
+  const qr = matrizQr(enderecoVerificacao(dados));
+  const lado = A / qr.length;
+  qr.forEach((linha, l) => linha.forEach((preto, c) => {
+    if (preto) pagina.drawRectangle({ x: x + c * lado, y: y + A - (l + 1) * lado, width: lado + 0.05, height: lado + 0.05, color: PRETO });
+  }));
+  const tx = x + A + 4;
+  const lt = L - A - 5;
   const linhas = linhasCarimbo(dados);
-  const estilos: [PDFFont, number][] = [[fontes.negrito, 6.2], [fontes.negrito, 6.8], [fontes.normal, 5.8], [fontes.normal, 5.8], [fontes.normal, 5.8]];
-  let base = y + A - 8.5;
-  linhas.forEach((l, i) => {
-    const [f, t] = estilos[i];
-    pagina.drawText(cortar(l, f, t, lt), { x: tx, y: base, size: t, font: f, color: i < 2 ? AZUL : CINZA });
-    base -= i === 0 ? 7.6 : 7.1;
+  const altTexto = ESTILO_LINHAS.reduce((s, e) => s + e.tamanho * 1.08 + e.depois, 0);
+  let topo = y + A - (A - altTexto) / 2;
+  linhas.forEach((t, i) => {
+    const e = ESTILO_LINHAS[i];
+    const f = e.negrito ? fontes.negrito : fontes.normal;
+    let tam = e.tamanho;
+    const txt = textoSeguro(t);
+    while (tam > 3.2 && f.widthOfTextAtSize(txt, tam) > lt) tam -= 0.1;
+    pagina.drawText(cortar(txt, f, tam, lt), { x: tx, y: topo - e.tamanho * 0.86, size: tam, font: f, color: PRETO });
+    topo -= e.tamanho * 1.08 + e.depois;
   });
 }
 
@@ -77,6 +81,7 @@ export async function montarPdfAssinado(
 ) {
   const doc = await PDFDocument.load(original);
   const fontes = { normal: await doc.embedFont(StandardFonts.Helvetica), negrito: await doc.embedFont(StandardFonts.HelveticaBold) };
+  const times = { normal: await doc.embedFont(StandardFonts.TimesRoman), negrito: await doc.embedFont(StandardFonts.TimesRomanBold) };
   const paginas = doc.getPages();
   const tamanhos = paginas.map((p) => ({ largura: p.getWidth(), altura: p.getHeight() }));
   const posicoes = posicoesDosCarimbos(assinaturas, salvas, lerLocais(doc), tamanhos);
@@ -88,7 +93,7 @@ export async function montarPdfAssinado(
       continue;
     }
     const pt = emPontos(pos, tamanhos[pos.pagina]);
-    desenharCarimbo(paginas[pos.pagina], fontes, pt.x, pt.y, { nome: a.nome, data: a.data, codigo: opcoes.codigo, endereco: opcoes.endereco });
+    desenharCarimbo(paginas[pos.pagina], times, pt.x, pt.y, { nome: a.nome, data: a.data, codigo: opcoes.codigo, endereco: opcoes.endereco });
   }
 
   // Página de registro das assinaturas.
@@ -116,7 +121,7 @@ export async function montarPdfAssinado(
     semLugar.forEach((a, i) => {
       const col = i % 2;
       if (col === 0 && i > 0) y -= CARIMBO.altura + 8;
-      desenharCarimbo(p, fontes, M + col * (CARIMBO.largura + 20), y - CARIMBO.altura, { nome: a.nome, data: a.data, codigo: opcoes.codigo, endereco: opcoes.endereco });
+      desenharCarimbo(p, times, M + col * (CARIMBO.largura + 20), y - CARIMBO.altura, { nome: a.nome, data: a.data, codigo: opcoes.codigo, endereco: opcoes.endereco });
     });
   }
   p.drawText(textoSeguro("Os carimbos de assinatura são desenhados sobre o documento original; o hash acima é o do arquivo assinado."), { x: M, y: 30, size: 7, font: fontes.normal, color: CINZA });

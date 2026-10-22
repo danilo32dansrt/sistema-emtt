@@ -49,7 +49,13 @@ describe("carimbo de assinatura", () => {
   it("escreve data e hora de Brasília e as linhas do carimbo", () => {
     expect(dataHoraCarimbo(new Date("2026-10-22T17:05:09Z"))).toBe("22/10/2026 14:05:09-0300");
     const l = linhasCarimbo({ nome: "Suely Exemplo", data: new Date("2026-10-22T17:05:09Z"), codigo: "abc123", endereco: "https://sistema.exemplo.com.br/" });
-    expect(l).toEqual(["Documento assinado digitalmente", "SUELY EXEMPLO", "Data: 22/10/2026 14:05:09-0300", "Verifique em sistema.exemplo.com.br/verificar", "Código: abc123"]);
+    expect(l).toEqual([
+      "Documento assinado digitalmente",
+      "SUELY EXEMPLO",
+      "Data: 22/10/2026 14:05:09-0300",
+      "art. 4º, I, da Lei nº 14.063/2020 e art. 10, § 2º, da MP nº 2.200-2/2001, com login e senha do signatário.",
+      "Verifique em https://sistema.exemplo.com.br/verificar/abc123",
+    ]);
     expect(linhasCarimbo({ nome: "Maria", codigo: "x" })[0]).toBe("Assinatura digital (prévia do lugar)");
   });
 });

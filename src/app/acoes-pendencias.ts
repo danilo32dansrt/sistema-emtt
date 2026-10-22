@@ -10,6 +10,7 @@ import {
 import { horariosDoEmpregado, jornadaDoEmpregado } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
 import { avisarEmpregada, avisarPatroes } from "@/lib/notificacoes";
+import { atenderEmergencia, encerrarEmergencia } from "@/lib/servicos/emergencia";
 import { fecharMesPeloPonto, resumoDoMes } from "@/lib/servicos/ponto";
 
 /**
@@ -141,9 +142,23 @@ export async function resolverPendencia(_: EstadoAcao, fd: FormData): Promise<Es
       await registrarAtividade({ usuarioId: u.id, clienteId: e.clienteId, acao: "AJUSTE_PONTO", descricao: `${u.nome} pediu ajuste em ${formatarData(data)}: ${horas.join(", ")}` });
       await avisarPatroes(e.clienteId, { chave: `pedido:${e.id}:${campo(fd, "data")}:${tipo}`, titulo: `${e.nome.split(" ")[0]} pediu ajuste no ponto de ${formatarData(data)}`, texto: `${tipo === "PEDIR_CONTRATO" ? "Diz que trabalhou no horário normal" : "Diz que saiu no horário normal"} (${horas.join(", ")}). Aprove ou recuse num toque.`, link: "/cliente", acao: "Responder" });
       mensagem = "Pedido enviado ao empregador. Você será avisada da resposta.";
+    } else if (tipo === "SOS_ATENDER" || tipo === "SOS_ENCERRAR") {
+      const em = await prisma.emergencia.findUniqueOrThrow({ where: { id: campo(fd, "emergenciaId") } });
+      const pode = u.papel === "CONSULTOR" || (u.papel === "CLIENTE" && u.clienteId === em.clienteId) || (tipo === "SOS_ENCERRAR" && u.empregadoId === em.empregadoId);
+      if (!pode) return { erro: "Sem permissão." };
+      if (tipo === "SOS_ATENDER") {
+        await atenderEmergencia(em.id, u);
+        mensagem = "Ela foi avisada de que você está indo.";
+      } else {
+        await encerrarEmergencia(em.id, u.id);
+        mensagem = "Emergência encerrada. As gravações continuam guardadas.";
+      }
+      revalidatePath("/consultor", "layout");
     } else {
       return { erro: "Ação desconhecida." };
     }
+    revalidatePath("/cliente", "layout");
+    revalidatePath("/ponto", "layout");
     revalidatePath("/cliente");
     revalidatePath("/cliente/ponto");
     revalidatePath("/ponto");

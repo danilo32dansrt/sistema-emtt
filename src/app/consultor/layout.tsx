@@ -1,20 +1,28 @@
+import { AlertaPendencias } from "@/components/AlertaPendencias";
 import { Casca } from "@/components/Casca";
 import { exigirConsultor } from "@/lib/auth/sessao";
+import { lembretesConsultor } from "@/lib/calculos";
 import { prisma } from "@/lib/db";
+import { alertasDeEmergencia } from "@/lib/servicos/emergencia";
+import { situacaoDoConsultor } from "@/lib/servicos/lembretes";
 import { quantidadeParametrosPendentes } from "@/lib/servicos/parametros";
 
 export const metadata = { manifest: "/manifest-consultor.webmanifest", appleWebApp: { capable: true, title: "Consultoria", statusBarStyle: "default" as const } };
 
 export default async function LayoutConsultor({ children }: { children: React.ReactNode }) {
   const u = await exigirConsultor();
-  const [ajustes, justificativas, mensagens, disciplinar, parametrosPendentes, avisos] = await Promise.all([
+  const [ajustes, justificativas, mensagens, disciplinar, parametrosPendentes, avisos, sos, situacao] = await Promise.all([
     prisma.ajustePonto.count({ where: { status: "PENDENTE" } }),
     prisma.justificativa.count({ where: { status: "PENDENTE" } }),
     prisma.mensagem.count({ where: { lidaEm: null, autor: { papel: "CLIENTE" } } }),
     prisma.ocorrenciaDisciplinar.count({ where: { status: "EM_ANALISE_CONSULTOR" } }),
     quantidadeParametrosPendentes(),
     prisma.notificacao.count({ where: { usuarioId: u.id, lidaEm: null } }),
+    alertasDeEmergencia({}),
+    situacaoDoConsultor(),
   ]);
+  // Alerta de tela cheia: SOS e as urgências que também repetem no celular (sem o resumo do dia)
+  const urgencias = lembretesConsultor(situacao).filter((l) => !l.chave.startsWith("resumo:")).map((l) => ({ ...l, chave: l.chave.split(":").slice(0, 2).join(":") }));
   return (
     <Casca
       titulo="Consultoria"
@@ -42,6 +50,7 @@ export default async function LayoutConsultor({ children }: { children: React.Re
         { href: "/consultor/lgpd", rotulo: "LGPD e backup", icone: "🔒" },
       ]}
     >
+      <AlertaPendencias itens={[...sos, ...urgencias]} />
       {children}
     </Casca>
   );

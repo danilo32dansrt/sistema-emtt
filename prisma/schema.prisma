@@ -324,6 +324,7 @@ model Empregado {
   justificativas Justificativa[]
   tratamentosDia TratamentoDia[]
   escalas        EscalaDia[]
+  emergencias    Emergencia[]
   espelhos       EspelhoPonto[]
   documentos     Documento[]
   ocorrencias    OcorrenciaDisciplinar[]
@@ -842,4 +843,37 @@ model PagamentoDae {
 
   @@index([status])
   @@index([clienteId])
+}
+
+/// SOS acionado pela empregada (segurando o botão por 2 s): avisa os patrões e o consultor e grava o áudio em trechos.
+model Emergencia {
+  id            String            @id @default(cuid())
+  empregadoId   String
+  empregado     Empregado         @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  clienteId     String
+  latitude      Float?
+  longitude     Float?
+  precisao      Float?
+  /// ATIVA, ATENDIDA (alguém respondeu "estou indo") ou ENCERRADA
+  status        String            @default("ATIVA")
+  atendidaPorId String?
+  atendidaPor   String?
+  atendidaEm    DateTime?
+  encerradaEm   DateTime?
+  iniciadaEm    DateTime          @default(now())
+  trechos       EmergenciaTrecho[]
+
+  @@index([clienteId, status])
+}
+
+/// Trecho de áudio gravado durante o SOS (enviado a cada ~15 s para não perder nada).
+model EmergenciaTrecho {
+  id           String     @id @default(cuid())
+  emergenciaId String
+  emergencia   Emergencia @relation(fields: [emergenciaId], references: [id], onDelete: Cascade)
+  arquivoId    String
+  ordem        Int
+  criadoEm     DateTime   @default(now())
+
+  @@index([emergenciaId, ordem])
 }

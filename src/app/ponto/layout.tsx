@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { sair } from "@/app/login/acoes";
+import { AlertaPendencias } from "@/components/AlertaPendencias";
 import { exigirEmpregado } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
+import { pendenciasDaEmpregada } from "@/lib/servicos/lembretes";
 
 export const metadata = { title: "Ponto" };
 
 export default async function LayoutPonto({ children }: { children: React.ReactNode }) {
   const u = await exigirEmpregado();
-  const avisos = await prisma.notificacao.count({ where: { usuarioId: u.id, lidaEm: null } });
+  const [avisos, pendencias] = await Promise.all([
+    prisma.notificacao.count({ where: { usuarioId: u.id, lidaEm: null } }),
+    u.empregadoId && u.consentimentoLgpdEm ? pendenciasDaEmpregada(u.empregadoId) : [],
+  ]);
   const itens = [
     { href: "/ponto", rotulo: "Ponto", icone: "⏱️" },
     { href: "/ponto/historico", rotulo: "Histórico", icone: "📋" },
@@ -26,6 +31,7 @@ export default async function LayoutPonto({ children }: { children: React.ReactN
           <form action={sair}><button className="text-sm text-slate-500">Sair</button></form>
         </span>
       </header>
+      <AlertaPendencias itens={pendencias} />
       <main className="px-4">{children}</main>
       <nav className="nao-imprimir fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white">
         <div className="mx-auto grid max-w-md grid-cols-5">

@@ -51,6 +51,8 @@ export interface Aviso {
   link?: string;
   /** Texto do botão que resolve a pendência (aparece na notificação do Android). */
   acao?: string;
+  /** Emergência: notificação fica fixa na tela, vibra forte e não é agrupada com outras. */
+  urgente?: boolean;
 }
 
 /** Cria o aviso (uma única vez por chave) e manda para os celulares do usuário. Devolve true se era novo. */
@@ -64,7 +66,7 @@ export async function notificar(usuarioId: string, a: Aviso): Promise<boolean> {
   if (!(await pushDisponivel())) return true;
   const inscricoes = await prisma.inscricaoPush.findMany({ where: { usuarioId } });
   // A tag agrupa repetições do mesmo lembrete: a notificação nova substitui a anterior no celular
-  const corpo = JSON.stringify({ titulo: a.titulo, texto: a.texto, link: a.link ?? "/", tag: a.chave.split(":").slice(0, 3).join(":"), acao: a.acao });
+  const corpo = JSON.stringify({ titulo: a.titulo, texto: a.texto, link: a.link ?? "/", tag: a.urgente ? a.chave : a.chave.split(":").slice(0, 3).join(":"), acao: a.acao, urgente: a.urgente });
   await Promise.all(
     inscricoes.map(async (i) => {
       try {

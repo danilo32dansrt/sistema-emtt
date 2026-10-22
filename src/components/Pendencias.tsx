@@ -26,7 +26,7 @@ export function Pendencias({ itens, titulo = "O que fazer agora" }: { itens: Pen
                   o.tipo === "LINK" ? (
                     <Link key={o.rotulo} href={o.link!} className={`flex min-h-12 items-center justify-center rounded-xl px-4 text-center font-semibold ${corLink[o.estilo ?? "secundario"]}`}>{o.rotulo}</Link>
                   ) : (
-                    <Formulario key={o.rotulo} acao={resolverPendencia} textoBotao={o.rotulo} variante={o.estilo ?? "primario"} confirmar={o.confirmar} className="space-y-2">
+                    <Formulario key={o.rotulo} acao={resolverPendencia} textoBotao={o.rotulo} variante={o.estilo ?? "primario"} confirmar={o.confirmar} className="space-y-2 [&_button]:w-full">
                       <input type="hidden" name="tipo" value={o.tipo} />
                       {Object.entries(o.dados ?? {}).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
                       {o.campo && <Campo id={`${o.campo.nome}-${p.chave.replace(/[^\w-]/g, "")}`} rotulo={o.campo.rotulo} name={o.campo.nome} inputMode="decimal" placeholder="0,00 (deixe vazio se não houve)" />}

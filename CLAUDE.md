@@ -122,6 +122,15 @@ valores em reais com 2 casas e datas dd/mm/aaaa.
   "saí às HH:MM" (pedido ao patrão) e "faltei — justificar". Decisões em `TratamentoDia`; nada é apagado e o outro
   lado é avisado. **Decidido com o dono: sem botão "discordo" — parte-se do princípio de que todos informam o real;
   o que o patrão lança passa a valer e os avisos à empregada são só informativos.** Mês sem nenhuma marcação não é descontado: pede para informar o mês.
+- **Alerta de tela cheia (pedido do dono: "aviso pequeno passa despercebido"):** nos três apps, enquanto houver pendência,
+  o layout abre por cima de tudo (`AlertaPendencias` + `TelaAlerta`) com os botões que resolvem; some quando tudo é
+  resolvido. "Resolver depois" adia 1 hora (pendência nova reabre na hora); tocar num botão que leva a outra tela dá 10 min.
+  As notificações com botão ficam fixas na tela do celular (`requireInteraction`).
+- **SOS da empregada:** botão vermelho no app do ponto, acionado segurando 2 s. Avisa na hora patrões e consultor
+  (notificação urgente fixa + alerta vermelho de tela cheia sem "depois"), envia a localização e grava o áudio em trechos
+  de 15 s (até 10 min) — `src/components/BotaoSOS.tsx`, `src/lib/servicos/emergencia.ts`, `/api/emergencia`,
+  página `/emergencia/[id]`. "Estou indo" avisa a empregada; repete a cada execução da rotina de 10 min enquanto ninguém
+  responde. LGPD: microfone só durante o SOS (proteção da vida, art. 7º, VII), texto no aviso de privacidade.
 - eSocial: versão inicial gera o resumo de rubricas para lançamento manual; webservice direto é estudo futuro.
 
 ### 4.2 Ferramentas extras

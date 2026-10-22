@@ -118,6 +118,16 @@ O sistema avisa: hora de bater o ponto, de sair e voltar do intervalo, de marcar
 (para os dois); pedidos de ajuste e justificativas (para o patrão) e a resposta (para a empregada); DAE a vencer, vencendo
 e atrasado. Tudo fica também na tela **Avisos** de cada um.
 
+**Alerta na tela até resolver:** ao abrir o app com alguma pendência, aparece um alerta grande por cima de tudo, com os
+botões que resolvem (Aprovar, Trabalhou no horário, Pagar o DAE…). Ele só some quando tudo é resolvido; "Resolver depois"
+adia por 1 hora. No celular, as notificações com botão ficam fixas na tela até a pessoa tocar.
+
+**SOS (emergência na casa):** no app do ponto há um botão vermelho **SOS**. A empregada segura por 2 segundos (um toque
+rápido não aciona) e na hora: os patrões e a consultoria recebem um alerta urgente (vibra forte e fica fixo na tela), com a
+localização; o celular dela começa a gravar o áudio (enviado a cada 15 segundos, por até 10 minutos) e mostra os botões
+para ligar 192, 193 e 190. Quem tocar em **Estou indo** faz aparecer na tela dela "Fulano está indo". Enquanto ninguém
+responder, o alerta se repete. As gravações ficam na página da emergência, só para os patrões e a consultoria.
+
 1. Chaves das notificações: **não precisa fazer nada** — o sistema gera sozinho no primeiro uso e guarda no banco.
    (Opcional: para usar as suas, gere com `npx web-push generate-vapid-keys` e coloque `VAPID_PUBLIC_KEY`,
    `VAPID_PRIVATE_KEY` e `VAPID_ASSUNTO` no `.env` e na Vercel.)

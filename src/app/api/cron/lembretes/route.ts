@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { repetirEmergenciasSemResposta } from "@/lib/servicos/emergencia";
 import { rodarLembretesConsultor, rodarLembretesPonto } from "@/lib/servicos/lembretes";
 
 /**
@@ -12,7 +13,8 @@ export async function GET(req: NextRequest) {
   // Para testar: ?agora=2026-11-03T11:35:00Z simula o horário (ex.: 08:35 em Brasília, entrada esquecida)
   const simulado = req.nextUrl.searchParams.get("agora");
   const agora = simulado && !Number.isNaN(Date.parse(simulado)) ? new Date(simulado) : new Date();
+  const sos = await repetirEmergenciasSemResposta(agora);
   const r = await rodarLembretesPonto(agora);
   const consultor = await rodarLembretesConsultor(agora);
-  return NextResponse.json({ ok: true, ...r, consultor });
+  return NextResponse.json({ ok: true, ...r, consultor, sos });
 }

@@ -106,6 +106,12 @@ valores em reais com 2 casas e datas dd/mm/aaaa.
   (horário comercial para dias anteriores e pedidos) e aparecem na tela inicial com o botão que resolve. Web Push (VAPID no `.env`), tabelas `Notificacao` (chave única = não repete)
   e `InscricaoPush`; regras puras em `calculos/lembretes.ts`; rotina `/api/cron/lembretes` a cada 10 min (agendador externo)
   e lembretes de DAE/pedidos no cron diário; avisos imediatos em pedidos de ajuste/justificativa e nas decisões.
+- **Pendências de um toque (sem formulário):** cada pendência traz os botões que a resolvem (`src/app/acoes-pendencias.ts`):
+  patrão — "trabalhou no horário normal" (lança o horário do contrato com intervalo, como ajuste aprovado), "faltou —
+  descontar", "abonar", "compensar" (só integral com acordo), "saiu no horário normal", aprovar/recusar pedidos e
+  "confirmar o mês" (fecha o mês pelo ponto, com adiantamento opcional); empregada — "trabalhei no meu horário" /
+  "saí às HH:MM" (pedido ao patrão) e "faltei — justificar". Decisões em `TratamentoDia`; nada é apagado e o outro
+  lado é avisado. Mês sem nenhuma marcação não é descontado: pede para informar o mês.
 - eSocial: versão inicial gera o resumo de rubricas para lançamento manual; webservice direto é estudo futuro.
 
 ### 4.2 Ferramentas extras

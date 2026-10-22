@@ -5,10 +5,10 @@ import { z } from "zod";
 import { erroParaEstado, type EstadoAcao } from "@/lib/acoes";
 import { registrarAtividade } from "@/lib/atividade";
 import { exigirPapel } from "@/lib/auth/sessao";
-import { arred, formatarCompetencia, formatarData } from "@/lib/calculos";
+import { formatarCompetencia, formatarData } from "@/lib/calculos";
 import { prisma } from "@/lib/db";
 import { avisarEmpregada } from "@/lib/notificacoes";
-import { espelhoDoMes } from "@/lib/servicos/ponto";
+import { fecharMesPeloPonto } from "@/lib/servicos/ponto";
 
 /** Consultor ou empregador (só dos próprios empregados) decide ajustes e justificativas. Nunca apaga marcações. */
 async function autorizar(empregadoId: string) {
@@ -57,23 +57,7 @@ export async function gerarLancamentoDoPonto(_: EstadoAcao, fd: FormData): Promi
   try {
     const d = z.object({ empregadoId: z.string(), ano: z.coerce.number(), mes: z.coerce.number() }).parse({ empregadoId: fd.get("empregadoId"), ano: fd.get("ano"), mes: fd.get("mes") });
     const { u, emp } = await autorizar(d.empregadoId);
-    const esp = await espelhoDoMes(emp, d.ano, d.mes);
-    const dados = {
-      faltasInjustificadas: esp.resumo.faltas,
-      semanasComFalta: esp.resumo.semanasComFalta,
-      faltasJustificadas: esp.resumo.faltasJustificadas,
-      atrasoMinutos: esp.resumo.atrasoDescontado,
-      horasExtras50: esp.horas.extras50,
-      horasExtras100: esp.horas.extras100,
-      horasNoturnas: arred(esp.horas.noturno, 2),
-      horasViagem: esp.horas.viagem,
-      horasIntervaloSuprimido: esp.horas.intervaloSuprimido,
-      origem: "PONTO",
-      enviadoPorId: u.id,
-      observacoes: esp.horas.banco ? `Banco de horas: +${esp.horas.banco} h no mês` : null,
-    };
-    await prisma.lancamentoMensal.upsert({ where: { empregadoId_ano_mes: { empregadoId: emp.id, ano: d.ano, mes: d.mes } }, create: { empregadoId: emp.id, ano: d.ano, mes: d.mes, ...dados }, update: dados });
-    await prisma.competencia.upsert({ where: { empregadoId_ano_mes: { empregadoId: emp.id, ano: d.ano, mes: d.mes } }, create: { empregadoId: emp.id, ano: d.ano, mes: d.mes, infoRecebida: true }, update: { infoRecebida: true } });
+    await fecharMesPeloPonto(emp, d.ano, d.mes, u.id);
     await registrarAtividade({ usuarioId: u.id, clienteId: emp.clienteId, acao: "LANCAMENTO_PONTO", descricao: `Informações de ${formatarCompetencia(d.ano, d.mes)} de ${emp.nome} geradas a partir do ponto` });
     revalidatePath("/consultor/rotina");
     return { ok: true, mensagem: "Informações do mês geradas a partir do ponto e enviadas para a rotina mensal." };

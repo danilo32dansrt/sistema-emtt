@@ -8,7 +8,9 @@ import { enviarJustificativa, pedirAjuste } from "../acoes";
 
 const COR = { PENDENTE: "amarelo", APROVADO: "verde", REJEITADO: "vermelho" } as const;
 
-export default async function Justificativas() {
+export default async function Justificativas({ searchParams }: { searchParams: Promise<{ data?: string }> }) {
+  // Vindo do botão "Faltei — justificar": a data já vem preenchida
+  const dataSugerida = /^\d{4}-\d{2}-\d{2}$/.test((await searchParams).data ?? "") ? (await searchParams).data : undefined;
   const u = await exigirEmpregado();
   const hoje = hojeBrasil();
   const [justificativas, ajustes, recentes] = await Promise.all([
@@ -29,7 +31,7 @@ export default async function Justificativas() {
             { valor: "FOLGA_COMPENSATORIA", rotulo: "Folga compensatória combinada" },
             { valor: "OUTRO", rotulo: "Outro" },
           ]} />
-          <Campo rotulo="Data" name="data" type="date" required />
+          <Campo rotulo="Data" name="data" type="date" required defaultValue={dataSugerida} />
           <Campo rotulo="Até (se mais de um dia)" name="dataFim" type="date" />
           <AreaTexto rotulo="Explique" name="descricao" required />
           <Campo rotulo="Comprovante (foto ou PDF)" name="anexo" type="file" accept="image/*,application/pdf" />
@@ -38,7 +40,7 @@ export default async function Justificativas() {
       <Cartao titulo="Esqueci de marcar / marquei errado">
         <Formulario acao={pedirAjuste} textoBotao="Pedir ajuste" limparAoSalvar>
           <Selecao rotulo="O que aconteceu?" name="tipo" opcoes={[{ valor: "INCLUSAO", rotulo: "Esqueci de marcar" }, { valor: "DESCONSIDERAR", rotulo: "Marquei errado (desconsiderar uma marcação)" }]} />
-          <Campo rotulo="Data" name="data" type="date" required />
+          <Campo rotulo="Data" name="data" type="date" required defaultValue={dataSugerida} />
           <Campo rotulo="Horário esquecido" name="hora" type="time" />
           <Selecao rotulo="Tipo da marcação esquecida" name="tipoMarcacao" opcoes={Object.entries(ROTULO_MARCACAO).map(([valor, rotulo]) => ({ valor, rotulo }))} />
           <Selecao rotulo="Marcação errada (se for o caso)" name="marcacaoId" opcoes={[{ valor: "", rotulo: "—" }, ...recentes.map((m) => ({ valor: m.id, rotulo: `${ROTULO_MARCACAO[m.tipo]} — ${m.dataHora.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}` }))]} />

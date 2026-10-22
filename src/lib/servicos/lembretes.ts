@@ -1,14 +1,16 @@
 import "server-only";
-import type { Afastamento, Empregado, Ferias, Justificativa } from "@prisma/client";
+import type { Afastamento, Empregado, Ferias, Justificativa, TratamentoDia } from "@prisma/client";
 import {
-  addDias, competenciaAnterior, DIAS_SEMANA, diaSemana, diferencaDias, ehDiaDeTrabalho12x36, ehFeriado, formatarCompetencia, formatarData, formatarMoeda,
-  hojeBrasil, lembretesCobrancaPlus, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, situacaoChecklist, ultimoDiaMes, partesLocais, vencimentoDae, type DiaPonto, type Lembrete,
+  addDias, agruparJornadas, competenciaAnterior, DIAS_SEMANA, diaSemana, diferencaDias, ehDiaDeTrabalho12x36, ehFeriado, formatarCompetencia, formatarData, formatarMoeda,
+  hojeBrasil, lembretesCobrancaPlus, lembretesConsultor, lembretesDae, lembretesFechamento, lembretesPedidosPendentes, lembretesPonto, marcacaoQueFalta, partesLocais,
+  situacaoChecklist, ultimoDiaMes, vencimentoDae, type DiaPonto, type Lembrete,
 } from "@/lib/calculos";
 import { horariosDoEmpregado, jornadaDoEmpregado, num } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
 import { notificar } from "@/lib/notificacoes";
 import { configuracao } from "@/lib/tabelas-db";
 import { situacaoParametros } from "./parametros";
+import { espelhoDoMes, resumoDoMes } from "./ponto";
 
 /** Quantos dias para trás uma pendência do ponto continua sendo lembrada. */
 const DIAS_PENDENCIA = 3;
@@ -16,12 +18,13 @@ const DIAS_PENDENCIA = 3;
 /** Instante UTC do início do dia local (Brasília) — o dia local começa às 03:00 UTC. */
 const inicioLocal = (d: Date) => new Date(d.getTime() + 3 * 3600_000);
 
-type EmpregadoCompleto = Empregado & { ferias: Ferias[]; afastamentos: Afastamento[]; justificativas: Justificativa[] };
+type EmpregadoCompleto = Empregado & { ferias: Ferias[]; afastamentos: Afastamento[]; justificativas: Justificativa[]; tratamentosDia: TratamentoDia[] };
 
 const incluirDias = (de: Date, hoje: Date) => ({
   ferias: { where: { inicioGozo: { lte: hoje } } },
   afastamentos: { where: { inicio: { lte: hoje }, OR: [{ fim: null }, { fim: { gte: de } }] } },
   justificativas: { where: { status: { in: ["APROVADO" as const, "PENDENTE" as const] }, data: { lte: hoje }, OR: [{ dataFim: null, data: { gte: de } }, { dataFim: { gte: de } }] } },
+  tratamentosDia: { where: { data: { gte: de, lte: hoje } } },
 });
 
 /** Monta os dias (hoje e os anteriores) com o previsto do contrato e as marcações, para as regras de lembrete. */
@@ -35,12 +38,14 @@ async function diasDoEmpregado(e: EmpregadoCompleto, hoje: Date) {
   const instantes = [...marcacoes.map((m) => m.dataHora), ...inclusoes.map((a) => a.dataHora).filter((d): d is Date => Boolean(d))];
   const jornada = jornadaDoEmpregado(e);
   const horarios = horariosDoEmpregado(e);
+  const jornadas = agruparJornadas(instantes);
   const montar = (d: Date): DiaPonto => {
     const ds = DIAS_SEMANA[diaSemana(d)];
     const previsto = e.regime === "DOZE_X_TRINTA_SEIS" ? (ehDiaDeTrabalho12x36(d, e.referencia12x36 ?? e.admissao) ? 720 : 0) : Math.round((jornada[ds] ?? 0) * 60);
     const deFerias = e.ferias.some((f) => d >= f.inicioGozo && d < addDias(f.inicioGozo, f.dias));
     const afastado = e.afastamentos.some((a) => d >= a.inicio && (!a.fim || d <= a.fim));
-    const justificado = e.justificativas.some((j) => d >= j.data && d <= (j.dataFim ?? j.data));
+    // Dia justificado ou já decidido pelo patrão (abonar/compensar/descontar) não é mais pendência
+    const justificado = e.justificativas.some((j) => d >= j.data && d <= (j.dataFim ?? j.data)) || e.tratamentosDia.some((t) => t.data.getTime() === d.getTime());
     const fora = d < e.admissao || (e.desligamento !== null && d > e.desligamento);
     return {
       data: d,
@@ -48,7 +53,8 @@ async function diasDoEmpregado(e: EmpregadoCompleto, hoje: Date) {
       previstoMinutos: previsto,
       entradaPrevista: horarios?.[ds]?.entrada,
       saidaPrevista: horarios?.[ds]?.saida,
-      marcacoes: instantes.filter((i) => partesLocais(i).data.getTime() === d.getTime()),
+      // A jornada pertence ao dia em que começou (turno da noite termina no dia seguinte)
+      marcacoes: jornadas.find((j) => j.data.getTime() === d.getTime())?.marcacoes ?? [],
     };
   };
   return { hoje: montar(hoje), anteriores: Array.from({ length: DIAS_PENDENCIA }, (_, i) => montar(addDias(hoje, -(i + 1)))) };
@@ -77,22 +83,152 @@ const buscarEmpregados = (where: object, hoje: Date) =>
     include: { ...incluirDias(addDias(hoje, -DIAS_PENDENCIA), hoje), usuario: { select: { id: true, ativo: true } }, cliente: { include: { usuarios: { where: { papel: "CLIENTE", ativo: true }, select: { id: true } } } } },
   });
 
+export interface OpcaoPendencia {
+  rotulo: string;
+  /** Tipo da ação de um toque (ver src/app/acoes-pendencias.ts) ou LINK. */
+  tipo: string;
+  dados?: Record<string, string>;
+  link?: string;
+  estilo?: "primario" | "sucesso" | "perigo" | "secundario";
+  confirmar?: string;
+  /** Campo opcional junto do botão (ex.: adiantamento no fechamento do mês). */
+  campo?: { nome: string; rotulo: string };
+}
+
+export interface PendenciaComAcoes extends Lembrete {
+  urgente?: boolean;
+  opcoes?: OpcaoPendencia[];
+}
+export type PendenciaPatrao = PendenciaComAcoes;
+
+/** Pendências do ponto deste momento já com os botões que resolvem cada uma. */
+async function pendenciasPontoNaTela(e: EmpregadoCompleto, agora: Date, para: "EMPREGADO" | "EMPREGADOR"): Promise<PendenciaComAcoes[]> {
+  const dias = await diasDoEmpregado(e, partesLocais(agora).data);
+  const lista = paraTela(lembretesPonto({ agora, nome: e.nome, ...dias, acordoIntervaloReduzido: e.acordoIntervaloReduzido, horarioComercial: { inicio: 0, fim: 24 * 60 } }), para);
+  const todos = [dias.hoje, ...dias.anteriores];
+  const compensa = e.regime === "INTEGRAL" && e.acordoCompensacao;
+  const nome = e.nome.split(" ")[0];
+  return lista.map((l) => {
+    const [tipo, diaIso] = l.chave.split(":");
+    const dia = todos.find((d) => d.data.toISOString().slice(0, 10) === diaIso);
+    const base = { empregadoId: e.id, data: diaIso };
+    const horario = dia?.entradaPrevista && dia?.saidaPrevista ? `${dia.entradaPrevista}–${dia.saidaPrevista}` : null;
+    const opcoes: OpcaoPendencia[] = [];
+    const tratar = (incluirDescontar = true) => {
+      if (incluirDescontar) opcoes.push({ rotulo: `${nome} faltou — descontar`, tipo: "TRATAR", dados: { ...base, tratamento: "DESCONTAR" }, estilo: "perigo" });
+      opcoes.push({ rotulo: "Abonar (não descontar)", tipo: "TRATAR", dados: { ...base, tratamento: "ABONAR" }, estilo: "secundario" });
+      if (compensa) opcoes.push({ rotulo: "Vai compensar no mês", tipo: "TRATAR", dados: { ...base, tratamento: "COMPENSAR" }, estilo: "secundario" });
+    };
+    if (para === "EMPREGADOR") {
+      if (tipo === "dia-sem") {
+        if (horario) opcoes.push({ rotulo: `Trabalhou no horário normal (${horario})`, tipo: "LANCAR_CONTRATO", dados: base, estilo: "sucesso" });
+        tratar();
+      } else if (tipo === "dia-incompleto") {
+        const falta = dia ? marcacaoQueFalta(dia.marcacoes.map((m) => partesLocais(m).minutos), dia.saidaPrevista) : null;
+        if (falta) opcoes.push({ rotulo: `Saiu às ${falta} (horário normal)`, tipo: "COMPLETAR_SAIDA", dados: { ...base, hora: falta }, estilo: "sucesso" });
+        opcoes.push({ rotulo: "Descontar o que faltou", tipo: "TRATAR", dados: { ...base, tratamento: "DESCONTAR" }, estilo: "secundario" });
+      } else if (tipo === "sem-entrada") {
+        tratar();
+      }
+    } else {
+      if (tipo === "dia-sem") {
+        if (horario) opcoes.push({ rotulo: `Trabalhei no meu horário (${horario})`, tipo: "PEDIR_CONTRATO", dados: { data: diaIso }, estilo: "sucesso" });
+        opcoes.push({ rotulo: "Faltei — justificar", tipo: "LINK", link: `/ponto/justificativas?data=${diaIso}`, estilo: "secundario" });
+      } else if (tipo === "dia-incompleto") {
+        const falta = dia ? marcacaoQueFalta(dia.marcacoes.map((m) => partesLocais(m).minutos), dia.saidaPrevista) : null;
+        if (falta) opcoes.push({ rotulo: `Saí às ${falta}`, tipo: "PEDIR_SAIDA", dados: { data: diaIso, hora: falta }, estilo: "sucesso" });
+        opcoes.push({ rotulo: "Informar outro horário", tipo: "LINK", link: "/ponto/justificativas", estilo: "secundario" });
+      }
+    }
+    return { ...l, chave: `${e.id}:${l.chave}`, opcoes: opcoes.length ? opcoes : undefined };
+  });
+}
+
 /** Botões de pendência na tela da empregada. */
 export async function pendenciasDaEmpregada(empregadoId: string, agora = new Date()) {
   const hoje = partesLocais(agora).data;
   const [e] = await buscarEmpregados({ id: empregadoId }, hoje);
-  return e ? paraTela(await lembretesDoEmpregado(e, agora, true), "EMPREGADO") : [];
+  return e ? pendenciasPontoNaTela(e, agora, "EMPREGADO") : [];
 }
 
-export interface PendenciaPatrao extends Lembrete {
-  urgente?: boolean;
+/** Pedidos da empregada, agrupados por dia, com Aprovar/Recusar num toque. */
+async function pedidosComBotoes(clienteId: string): Promise<PendenciaComAcoes[]> {
+  const [ajustes, justificativas] = await Promise.all([
+    prisma.ajustePonto.findMany({ where: { status: "PENDENTE", empregado: { clienteId } }, include: { empregado: { select: { nome: true } } }, orderBy: [{ data: "asc" }, { dataHora: "asc" }] }),
+    prisma.justificativa.findMany({ where: { status: "PENDENTE", empregado: { clienteId } }, include: { empregado: { select: { nome: true } } }, orderBy: { data: "asc" } }),
+  ]);
+  const lista: PendenciaComAcoes[] = [];
+  const grupos = new Map<string, typeof ajustes>();
+  for (const a of ajustes) {
+    const k = `${a.empregadoId}:${a.data.toISOString().slice(0, 10)}`;
+    grupos.set(k, [...(grupos.get(k) ?? []), a]);
+  }
+  for (const [k, grupo] of grupos) {
+    const [empregadoId, data] = k.split(":");
+    const nome = grupo[0].empregado.nome.split(" ")[0];
+    const horas = grupo.filter((a) => a.dataHora).map((a) => partesLocais(a.dataHora!).hora).join(", ");
+    lista.push({
+      chave: `pedido-ajuste:${k}`, para: "EMPREGADOR", link: "/cliente/ponto", acao: "Ver no ponto", urgente: true,
+      titulo: `${nome} pediu ajuste no ponto de ${formatarData(grupo[0].data)}`,
+      texto: `${grupo.some((a) => a.tipo === "DESCONSIDERAR") ? "Desconsiderar marcação errada" : `Incluir ${horas}`}. Motivo: ${grupo[0].justificativa.slice(0, 140)}`,
+      opcoes: [
+        { rotulo: "Aprovar", tipo: "DECIDIR_AJUSTES", dados: { empregadoId, data, decisao: "APROVADO" }, estilo: "sucesso" },
+        { rotulo: "Recusar", tipo: "DECIDIR_AJUSTES", dados: { empregadoId, data, decisao: "REJEITADO" }, estilo: "secundario", confirmar: "Recusar o pedido? A empregada será avisada." },
+      ],
+    });
+  }
+  for (const j of justificativas) {
+    const nome = j.empregado.nome.split(" ")[0];
+    lista.push({
+      chave: `pedido-justificativa:${j.id}`, para: "EMPREGADOR", link: "/cliente/ponto", acao: "Ver no ponto", urgente: true,
+      titulo: `${nome} justificou ${j.dataFim ? `de ${formatarData(j.data)} a ${formatarData(j.dataFim)}` : `o dia ${formatarData(j.data)}`}`,
+      texto: `${j.tipo.replace(/_/g, " ").toLowerCase()}: ${j.descricao.slice(0, 140)}${j.arquivoId ? " (com comprovante)" : ""}`,
+      opcoes: [
+        { rotulo: "Aceitar (não desconta)", tipo: "DECIDIR_JUSTIFICATIVA", dados: { id: j.id, decisao: "APROVADO" }, estilo: "sucesso" },
+        ...(j.arquivoId ? [{ rotulo: "Ver comprovante", tipo: "LINK", link: `/api/arquivos/${j.arquivoId}`, estilo: "secundario" as const }] : []),
+        { rotulo: "Recusar", tipo: "DECIDIR_JUSTIFICATIVA", dados: { id: j.id, decisao: "REJEITADO" }, estilo: "secundario", confirmar: "Recusar a justificativa? O dia poderá ser descontado." },
+      ],
+    });
+  }
+  return lista;
 }
 
-/** Botões de pendência na tela do patrão: ponto dos empregados, pedidos esperando resposta e DAE. */
+/** Fechamento do mês anterior (quem usa o app de ponto): resumo pronto e "Confirmar" num toque. */
+async function fechamentosComBotoes(empregados: EmpregadoCompleto[], hoje: Date): Promise<PendenciaComAcoes[]> {
+  const cfg = await configuracao();
+  if (hoje.getUTCDate() > cfg.diaEmissaoGuias) return [];
+  const comp = competenciaAnterior(hoje.getUTCFullYear(), hoje.getUTCMonth() + 1);
+  const lista: PendenciaComAcoes[] = [];
+  for (const e of empregados) {
+    if (e.admissao > ultimoDiaMes(comp.ano, comp.mes)) continue;
+    const c = await prisma.competencia.findUnique({ where: { empregadoId_ano_mes: { empregadoId: e.id, ano: comp.ano, mes: comp.mes } } });
+    if (c?.infoRecebida) continue;
+    const nome = e.nome.split(" ")[0];
+    const competencia = formatarCompetencia(comp.ano, comp.mes);
+    const esp = e.pontoAtivo ? await espelhoDoMes(e, comp.ano, comp.mes, ultimoDiaMes(comp.ano, comp.mes)) : null;
+    // Sem app de ponto (ou sem nenhuma marcação no mês, ex.: começou a usar depois): o mês precisa ser informado
+    if (!esp || (esp.marcacoes.length === 0 && esp.ajustes.length === 0)) {
+      lista.push({ chave: `fechamento:${e.id}:${competencia}`, para: "EMPREGADOR", link: "/cliente/informar", acao: "Informar o mês", urgente: true, titulo: `Informe o mês de ${competencia} — ${nome}`, texto: `${esp ? "Não há marcações de ponto neste mês" : "Ela não usa o app de ponto"}: informe as faltas, horas extras e adiantamento para o consultor fazer a folha.` });
+      continue;
+    }
+    const pendentes = esp.dias.filter((d) => d.inconsistencias.some((i) => i.includes("ímpar"))).length;
+    lista.push({
+      chave: `fechamento:${e.id}:${competencia}`, para: "EMPREGADOR", link: `/cliente/ponto?empregado=${e.id}&ano=${comp.ano}&mes=${comp.mes}`, acao: "Ver o ponto do mês", urgente: true,
+      titulo: `Feche o ponto de ${competencia} — ${nome}`,
+      texto: `${resumoDoMes(esp)}${pendentes ? ` Atenção: ${pendentes} dia(s) incompleto(s) — resolva antes ou serão descontados.` : ""} Confirme para o consultor fazer a folha.`,
+      opcoes: [{ rotulo: "Confirmar e enviar ao consultor", tipo: "FECHAR_MES", dados: { empregadoId: e.id, ano: String(comp.ano), mes: String(comp.mes) }, estilo: "sucesso", campo: { nome: "adiantamento", rotulo: "Adiantamento pago no mês (R$, se houve)" } }],
+    });
+  }
+  return lista;
+}
+
+/** Botões de pendência na tela do patrão: fechamento do mês, pedidos, ponto dos empregados e DAE. */
 export async function pendenciasDoPatrao(clienteId: string, agora = new Date()): Promise<PendenciaPatrao[]> {
   const hoje = partesLocais(agora).data;
   const lista: PendenciaPatrao[] = [];
   const empregados = await buscarEmpregados({ clienteId }, hoje);
+  lista.push(...(await fechamentosComBotoes(empregados, hoje)));
+  lista.push(...(await pedidosComBotoes(clienteId)));
   // DAE da competência anterior (vence dia 7): botão a partir de 5 dias antes até ser pago
   const comp = competenciaAnterior(hoje.getUTCFullYear(), hoje.getUTCMonth() + 1);
   const venc = vencimentoDae(comp.ano, comp.mes);
@@ -113,14 +249,13 @@ export async function pendenciasDoPatrao(clienteId: string, agora = new Date()):
     if (dias > 5) continue;
     const valor = c.daeValor ? ` de ${formatarMoeda(num(c.daeValor))}` : "";
     lista.push({
-      chave: `dae:${c.id}`, para: "EMPREGADOR", link: "/cliente/dae", acao: "Pagar o DAE agora", urgente: dias <= 0,
+      chave: `dae:${c.id}`, para: "EMPREGADOR", link: "/cliente/dae", acao: "Ver o DAE e o código de barras", urgente: dias <= 0,
       titulo: dias < 0 ? `DAE em atraso — ${c.empregado.nome.split(" ")[0]}` : dias === 0 ? `Hoje é dia de pagar o DAE — ${c.empregado.nome.split(" ")[0]}` : `DAE vence em ${dias} dia(s) — ${c.empregado.nome.split(" ")[0]}`,
-      texto: `Competência ${formatarCompetencia(c.ano, c.mes)}${valor}, vencimento ${formatarData(venc)}. Depois de pagar, toque em "Já paguei".`,
+      texto: `Competência ${formatarCompetencia(c.ano, c.mes)}${valor}, vencimento ${formatarData(venc)}. Pague no app do banco e confirme aqui.`,
+      opcoes: [{ rotulo: "Já paguei", tipo: "DAE_PAGO", dados: { competenciaId: c.id }, estilo: "sucesso", confirmar: "Confirmar que o DAE foi pago? O consultor vai conferir." }],
     });
   }
-  const pendentes = await contarPedidos(clienteId);
-  if (pendentes) lista.push(...lembretesPedidosPendentes({ agora, pendentes, horarioComercial: { inicio: 0, fim: 24 * 60 } }).map((l) => ({ ...l, urgente: true })));
-  for (const e of empregados) lista.push(...paraTela(await lembretesDoEmpregado(e, agora, true), "EMPREGADOR"));
+  for (const e of empregados) lista.push(...(await pendenciasPontoNaTela(e, agora, "EMPREGADOR")));
   return lista;
 }
 
@@ -147,6 +282,22 @@ export async function rodarLembretesPonto(agora = new Date()) {
   for (const c of clientes) {
     const pendentes = await contarPedidos(c.id);
     for (const l of lembretesPedidosPendentes({ agora, pendentes })) for (const u of c.usuarios) if (await notificar(u.id, { ...l })) enviados++;
+  }
+  // Fechamento do mês anterior (app de ponto): lembra o patrão a cada hora até ele confirmar
+  const cfg = await configuracao();
+  if (hoje.getUTCDate() <= cfg.diaEmissaoGuias) {
+    const comp = competenciaAnterior(hoje.getUTCFullYear(), hoje.getUTCMonth() + 1);
+    for (const e of empregados.filter((x) => x.pontoAtivo && x.admissao <= ultimoDiaMes(comp.ano, comp.mes))) {
+      const c = await prisma.competencia.findUnique({ where: { empregadoId_ano_mes: { empregadoId: e.id, ano: comp.ano, mes: comp.mes } } });
+      if (c?.infoRecebida) continue;
+      const previa = lembretesFechamento({ agora, competencia: formatarCompetencia(comp.ano, comp.mes), fechado: false, diaLimite: cfg.diaEmissaoGuias, nome: e.nome, resumo: "" });
+      if (!previa.length) continue;
+      const esp = await espelhoDoMes(e, comp.ano, comp.mes, ultimoDiaMes(comp.ano, comp.mes));
+      const semMarcacoes = esp.marcacoes.length === 0 && esp.ajustes.length === 0;
+      for (const l of lembretesFechamento({ agora, competencia: formatarCompetencia(comp.ano, comp.mes), fechado: false, diaLimite: cfg.diaEmissaoGuias, nome: e.nome, resumo: semMarcacoes ? "Não há marcações de ponto neste mês: informe as faltas e horas extras." : resumoDoMes(esp) })) {
+        for (const u of e.cliente.usuarios) if (await notificar(u.id, { ...l, chave: `${e.id}:${l.chave}` })) enviados++;
+      }
+    }
   }
   // Plano Plus: cobrança do mês (mensalidade + DAE) ainda não paga
   for (const m of await prisma.mensalidade.findMany({ where: { status: "ABERTO", valorDae: { gt: 0 }, cliente: { plano: "PLUS", ativo: true } }, include: { cliente: { select: { usuarios: { where: { papel: "CLIENTE", ativo: true }, select: { id: true } } } } } })) {

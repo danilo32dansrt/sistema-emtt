@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { data, instanteLocal, intervaloMinimo, lembretesCobrancaPlus, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, type DiaPonto } from "..";
+import { data, instanteLocal, instantesDoDia, intervaloMinimo, lembretesCobrancaPlus, lembretesFechamento, marcacaoQueFalta, marcacoesDoContrato, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, type DiaPonto } from "..";
 
 const qua = data(2026, 3, 4);
 const ter = data(2026, 3, 3);
@@ -117,5 +117,33 @@ describe("plano Plus — cobrança do mês", () => {
     expect(em(data(2026, 11, 5), "10:00")).toEqual(["Hoje vence a cobrança do mês"]);
     expect(em(data(2026, 11, 6), "10:00")).toEqual(["Cobrança do mês em atraso"]);
     expect(em(data(2026, 11, 6), "22:00")).toEqual([]);
+  });
+});
+
+describe("ações de um toque", () => {
+  it("horário do contrato com intervalo no meio da jornada", () => {
+    expect(marcacoesDoContrato("08:00", "17:00", 480)).toEqual(["08:00", "12:00", "13:00", "17:00"]);
+    expect(marcacoesDoContrato("08:00", "12:24", 264)).toEqual(["08:00", "10:10", "10:25", "12:24"]);
+    expect(marcacoesDoContrato("08:00", "12:00", 240)).toEqual(["08:00", "12:00"]);
+    expect(marcacoesDoContrato("19:00", "07:00", 660)).toEqual(["19:00", "00:30", "01:30", "07:00"]);
+  });
+  it("marcação que falta num dia incompleto é a saída do contrato", () => {
+    expect(marcacaoQueFalta([480, 720, 780], "17:00")).toBe("17:00");
+    expect(marcacaoQueFalta([480, 720], "17:00")).toBeNull();
+    expect(marcacaoQueFalta([480, 1100], "17:00")).toBeNull();
+  });
+  it("lembra de fechar o mês do dia 1º até o prazo, até confirmar", () => {
+    const base = { competencia: "10/2026", diaLimite: 3, nome: "Maria Exemplo", resumo: "Sem faltas, 2h extras." };
+    expect(lembretesFechamento({ ...base, agora: instanteLocal(data(2026, 11, 2), "10:00"), fechado: false })[0].titulo).toBe("Feche o ponto de 10/2026 — Maria");
+    expect(lembretesFechamento({ ...base, agora: instanteLocal(data(2026, 11, 2), "10:00"), fechado: true })).toEqual([]);
+    expect(lembretesFechamento({ ...base, agora: instanteLocal(data(2026, 11, 4), "10:00"), fechado: false })).toEqual([]);
+  });
+});
+
+describe("turno que passa da meia-noite", () => {
+  it("horas depois da meia-noite caem no dia seguinte", () => {
+    const i = instantesDoDia(data(2026, 10, 20), ["22:00", "02:00", "03:00", "07:00"]);
+    expect(i.map((x) => x.toISOString())).toEqual(["2026-10-21T01:00:00.000Z", "2026-10-21T05:00:00.000Z", "2026-10-21T06:00:00.000Z", "2026-10-21T10:00:00.000Z"]);
+    expect(instantesDoDia(data(2026, 10, 20), ["08:00", "17:00"]).map((x) => x.toISOString())).toEqual(["2026-10-20T11:00:00.000Z", "2026-10-20T20:00:00.000Z"]);
   });
 });

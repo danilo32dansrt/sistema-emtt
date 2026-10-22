@@ -1,5 +1,5 @@
 import { diferencaDias, formatarData, horaParaMinutos } from "./datas";
-import { partesLocais } from "./ponto";
+import { instanteLocal, partesLocais } from "./ponto";
 
 /**
  * Lembretes automáticos do ponto e do DAE (regras puras, sem banco).
@@ -221,4 +221,64 @@ export function lembretesCobrancaPlus(e: { agora: Date; vencimento: Date; total:
     link: "/cliente/mensalidade",
     acao: "Pagar agora",
   }];
+}
+
+const hhmm = (min: number) => {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
+
+/**
+ * Marcações do horário do contrato para lançar um dia inteiro num toque ("ela trabalhou no horário normal"):
+ * entrada, intervalo no meio da jornada quando é obrigatório, e saída.
+ */
+export function marcacoesDoContrato(entrada: string, saida: string, previstoMinutos: number, acordoIntervaloReduzido = false): string[] {
+  const ini = horaParaMinutos(entrada);
+  let fim = horaParaMinutos(saida);
+  if (fim <= ini) fim += 1440;
+  const intervalo = intervaloMinimo(previstoMinutos, acordoIntervaloReduzido);
+  if (!intervalo) return [entrada, saida];
+  const parte1 = Math.round(previstoMinutos / 2 / 5) * 5;
+  const saidaIntervalo = ini + parte1;
+  let retorno = fim - (previstoMinutos - parte1);
+  if (retorno - saidaIntervalo < intervalo) retorno = saidaIntervalo + intervalo;
+  return [entrada, hhmm(saidaIntervalo), hhmm(retorno), saida];
+}
+
+/** Marcação que falta num dia incompleto: a saída do contrato (se for depois da última marcação). */
+export function marcacaoQueFalta(marcacoesMin: number[], saidaPrevista?: string): string | null {
+  if (marcacoesMin.length % 2 === 0 || !saidaPrevista) return null;
+  const saida = horaParaMinutos(saidaPrevista);
+  const ultima = Math.max(...marcacoesMin);
+  return saida > ultima ? saidaPrevista : null;
+}
+
+/**
+ * Fechamento do mês pelo patrão: do dia 1º até o prazo das informações ao consultor, lembra a cada hora
+ * (horário comercial) até ele confirmar o ponto do mês anterior.
+ */
+export function lembretesFechamento(e: { agora: Date; competencia: string; fechado: boolean; diaLimite: number; nome: string; resumo: string; repetirMinutos?: number; horarioComercial?: { inicio: number; fim: number } }): Lembrete[] {
+  const local = partesLocais(e.agora);
+  const c = e.horarioComercial ?? HORARIO_COMERCIAL_PADRAO;
+  if (e.fechado || local.data.getUTCDate() > e.diaLimite || local.minutos < c.inicio || local.minutos >= c.fim) return [];
+  return [{
+    chave: `fechamento:${e.competencia}:${janela(e.agora, e.repetirMinutos ?? 60)}`,
+    para: "EMPREGADOR",
+    titulo: `Feche o ponto de ${e.competencia} — ${primeiroNome(e.nome)}`,
+    texto: `${e.resumo} Confira e toque em "Confirmar" para o consultor fazer a folha.`,
+    link: "/cliente",
+    acao: "Confirmar o mês",
+  }];
+}
+
+/** Instantes das marcações de um dia, passando para o dia seguinte o que vem depois da meia-noite (turno noturno). */
+export function instantesDoDia(dia: Date, horas: string[]): Date[] {
+  let extra = 0;
+  let anterior = -1;
+  return horas.map((h) => {
+    const m = horaParaMinutos(h);
+    if (anterior >= 0 && m < anterior) extra += 1;
+    anterior = m;
+    return instanteLocal(new Date(dia.getTime() + extra * 86_400_000), h);
+  });
 }

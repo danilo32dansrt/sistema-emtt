@@ -310,6 +310,7 @@ model Empregado {
   marcacoes      MarcacaoPonto[]
   ajustes        AjustePonto[]
   justificativas Justificativa[]
+  tratamentosDia TratamentoDia[]
   espelhos       EspelhoPonto[]
   documentos     Documento[]
   ocorrencias    OcorrenciaDisciplinar[]
@@ -490,6 +491,22 @@ model Justificativa {
   criadoEm      DateTime          @default(now())
 
   @@index([empregadoId, data])
+}
+
+/// Decisão do empregador sobre um dia com horas faltando (sem marcação ou incompleto): abonar, compensar ou descontar.
+model TratamentoDia {
+  id            String    @id @default(cuid())
+  empregadoId   String
+  empregado     Empregado @relation(fields: [empregadoId], references: [id], onDelete: Cascade)
+  data          DateTime  @db.Date
+  /// ABONAR, COMPENSAR ou DESCONTAR
+  tratamento    String
+  motivo        String?
+  decididoPorId String?
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+
+  @@unique([empregadoId, data])
 }
 
 model EspelhoPonto {

@@ -18,10 +18,11 @@ export async function espelhoDoMes(e: Empregado, ano: number, mes: number, hoje:
   // Margem de 1 dia para jornadas que atravessam a meia-noite
   const de = new Date(addDias(inicio, -1).getTime() + 3 * 3600_000);
   const ate = new Date(addDias(fim, 2).getTime() + 3 * 3600_000);
-  const [marcacoes, ajustes, justificativas] = await Promise.all([
+  const [marcacoes, ajustes, justificativas, tratamentos] = await Promise.all([
     prisma.marcacaoPonto.findMany({ where: { empregadoId: e.id, dataHora: { gte: de, lt: ate } }, orderBy: { dataHora: "asc" } }),
     prisma.ajustePonto.findMany({ where: { empregadoId: e.id, status: "APROVADO", data: { gte: addDias(inicio, -1), lte: addDias(fim, 1) } } }),
     prisma.justificativa.findMany({ where: { empregadoId: e.id, status: "APROVADO", data: { lte: fim }, OR: [{ dataFim: null, data: { gte: inicio } }, { dataFim: { gte: inicio } }] } }),
+    prisma.tratamentoDia.findMany({ where: { empregadoId: e.id, data: { gte: inicio, lte: fim } } }),
   ]);
 
   const desconsideradas = new Set(ajustes.filter((a) => a.tipo === "DESCONSIDERAR" && a.marcacaoId).map((a) => a.marcacaoId!));
@@ -50,6 +51,8 @@ export async function espelhoDoMes(e: Empregado, ano: number, mes: number, hoje:
       previstoMinutos,
       abonado: Boolean(just && just.tipo !== "VIAGEM"),
       viagem: just?.tipo === "VIAGEM",
+      // Decisão do patrão sobre as horas que faltaram (abonar, compensar ou descontar)
+      tratamento: tratamentos.find((t) => t.data.getTime() === d.getTime())?.tratamento as "ABONAR" | "COMPENSAR" | "DESCONTAR" | undefined,
       ultimaSaidaAnterior: ultimaSaida,
     });
     if (just) r.inconsistencias = r.inconsistencias.filter((i) => !i.includes("ímpar"));
@@ -88,6 +91,7 @@ export async function espelhoDoMes(e: Empregado, ano: number, mes: number, hoje:
     }),
     ajustes,
     justificativas,
+    tratamentos,
     horas: {
       previsto: h(resumo.previsto),
       trabalhado: h(resumo.trabalhado),
@@ -100,4 +104,42 @@ export async function espelhoDoMes(e: Empregado, ano: number, mes: number, hoje:
       viagem: h(resumo.viagem),
     },
   };
+}
+
+/**
+ * Fecha o mês a partir do ponto: grava as informações do mês (faltas, atrasos, extras, noturno) para a folha
+ * e marca "informações recebidas" na rotina do consultor. Opcionalmente registra o adiantamento pago.
+ */
+export async function fecharMesPeloPonto(e: Empregado, ano: number, mes: number, usuarioId: string, adiantamento?: number) {
+  const esp = await espelhoDoMes(e, ano, mes, ultimoDiaMes(ano, mes) < hojeBrasil() ? ultimoDiaMes(ano, mes) : hojeBrasil());
+  const dados = {
+    faltasInjustificadas: esp.resumo.faltas,
+    semanasComFalta: esp.resumo.semanasComFalta,
+    faltasJustificadas: esp.resumo.faltasJustificadas,
+    atrasoMinutos: esp.resumo.atrasoDescontado,
+    horasExtras50: esp.horas.extras50,
+    horasExtras100: esp.horas.extras100,
+    horasNoturnas: arred(esp.horas.noturno, 2),
+    horasViagem: esp.horas.viagem,
+    horasIntervaloSuprimido: esp.horas.intervaloSuprimido,
+    origem: "PONTO",
+    enviadoPorId: usuarioId,
+    observacoes: esp.horas.banco ? `Banco de horas: +${esp.horas.banco} h no mês` : null,
+    ...(adiantamento !== undefined ? { adiantamento } : {}),
+  };
+  await prisma.lancamentoMensal.upsert({ where: { empregadoId_ano_mes: { empregadoId: e.id, ano, mes } }, create: { empregadoId: e.id, ano, mes, ...dados }, update: dados });
+  await prisma.competencia.upsert({ where: { empregadoId_ano_mes: { empregadoId: e.id, ano, mes } }, create: { empregadoId: e.id, ano, mes, infoRecebida: true }, update: { infoRecebida: true } });
+  return esp;
+}
+
+/** Resumo do mês em uma frase, para o patrão conferir antes de fechar. */
+export function resumoDoMes(esp: Awaited<ReturnType<typeof espelhoDoMes>>): string {
+  const partes = [
+    esp.resumo.faltas ? `${esp.resumo.faltas} falta(s)` : "nenhuma falta",
+    esp.resumo.faltasJustificadas ? `${esp.resumo.faltasJustificadas} justificada(s)` : "",
+    esp.resumo.atrasoDescontado ? `${esp.resumo.atrasoDescontado} min de atraso/saída antecipada` : "",
+    esp.horas.extras50 + esp.horas.extras100 ? `${String(arred(esp.horas.extras50 + esp.horas.extras100, 2)).replace(".", ",")} h extras` : "sem horas extras",
+    esp.resumo.noturno ? "com horas noturnas" : "",
+  ].filter(Boolean);
+  return `${partes.join(", ")}.`;
 }

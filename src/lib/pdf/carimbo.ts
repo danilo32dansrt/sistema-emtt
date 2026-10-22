@@ -99,8 +99,8 @@ export async function montarPdfAssinado(
   // Página de registro das assinaturas.
   const [W, H] = [595.28, 841.89];
   const p = doc.addPage([W, H]);
-  const M = 50;
-  let y = H - M;
+  const M = (3 * 72) / 2.54; // margens padrão: 3 cm dos lados, 2,5 cm em cima
+  let y = H - (2.5 * 72) / 2.54;
   const linha = (t: string, f = fontes.normal, tam = 10) => {
     p.drawText(cortar(t, f, tam, W - 2 * M), { x: M, y: y - tam, size: tam, font: f });
     y -= tam + 6;

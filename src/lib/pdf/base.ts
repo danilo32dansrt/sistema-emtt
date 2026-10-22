@@ -24,7 +24,11 @@ export function propriedadesPdf(doc: PDFDocument): PDFDict | undefined {
   const ref = doc.context.trailerInfo.Info;
   return ref ? doc.context.lookup(ref, PDFDict) : undefined;
 }
-const MARGEM = 50;
+/** Margens padrão de todos os documentos (como no Word): 2,5 cm em cima e embaixo, 3 cm dos lados. */
+const CM = 72 / 2.54;
+const MARGEM_SUP = 2.5 * CM;
+const MARGEM_INF = 2.5 * CM;
+const MARGEM = 3 * CM;
 
 /** Pequeno "editor" de PDF: títulos, parágrafos com quebra automática, tabelas e assinaturas. */
 export class DocPdf {
@@ -58,7 +62,7 @@ export class DocPdf {
   novaPagina() {
     this.pagina = this.doc.addPage(A4);
     this.numeroPaginas++;
-    this.y = A4[1] - MARGEM;
+    this.y = A4[1] - MARGEM_SUP;
     if (this.cabecalho.rodape) {
       let r = textoSeguro(this.cabecalho.rodape);
       while (r.length > 10 && this.fonte.widthOfTextAtSize(r, 6.5) > this.largura - 50) r = r.slice(0, -1);
@@ -68,7 +72,7 @@ export class DocPdf {
   }
 
   private garantir(altura: number) {
-    if (this.y - altura < MARGEM + 10) this.novaPagina();
+    if (this.y - altura < MARGEM_INF + 10) this.novaPagina();
   }
 
   private quebrar(texto: string, tamanho: number, fonte: PDFFont, largura = this.largura): string[] {
@@ -144,7 +148,9 @@ export class DocPdf {
 
   tabela(cabecalho: string[], linhas: string[][], larguras?: number[], opcoes: { tamanho?: number; alinharDireita?: number[] } = {}) {
     const tam = opcoes.tamanho ?? 9;
-    const ws = larguras ?? cabecalho.map(() => this.largura / cabecalho.length);
+    const soma = larguras?.reduce((t, w) => t + w, 0) ?? 0;
+    // larguras são proporções: a tabela sempre ocupa a largura útil entre as margens
+    const ws = larguras && soma ? larguras.map((w) => (w * this.largura) / soma) : cabecalho.map(() => this.largura / cabecalho.length);
     const desenhar = (cols: string[], fonte: PDFFont, fundo?: boolean) => {
       const altura = tam + 7;
       this.garantir(altura);

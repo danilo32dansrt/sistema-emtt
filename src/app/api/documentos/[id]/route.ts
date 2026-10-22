@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { registrarAtividade } from "@/lib/atividade";
 import { usuarioAtual } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
+import { baseVerificacao } from "@/lib/assinatura/endereco";
 import { montarPdfAssinado } from "@/lib/pdf/carimbo";
 import { podeVerDocumento } from "@/lib/servicos/acesso-documentos";
 
@@ -27,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       bytes,
       assinaturas.map((a) => ({ usuarioId: a.usuarioId, nome: a.nome, papel: a.papel, data: a.assinadoEm, ip: a.ip, hash: a.hashDocumento })),
       Object.fromEntries(posicoes.map((p) => [p.usuarioId, { pagina: p.pagina, x: p.x, y: p.y }])),
-      { codigo: doc.id, endereco: process.env.APP_URL },
+      { codigo: doc.codigoVerificacao, endereco: baseVerificacao() },
     );
   }
   if (!original) await registrarAtividade({ usuarioId: u.id, clienteId: doc.clienteId, acao: "DOCUMENTO_ACESSADO", descricao: `${u.nome} abriu "${doc.titulo}"` });

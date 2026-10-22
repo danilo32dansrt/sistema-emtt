@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CARIMBO, dataHoraCarimbo, fusoHorario, emPontos, limitarPosicao, linhasCarimbo, papelDaLinha, posicaoPadrao, posicoesDosCarimbos, type LocalAssinatura } from "./carimbo";
+import { CARIMBO, dataHoraCarimbo, enderecoVerificacao, FORMATO_CODIGO, fusoHorario, emPontos, limitarPosicao, linhasCarimbo, papelDaLinha, posicaoPadrao, posicoesDosCarimbos, type LocalAssinatura } from "./carimbo";
 
 const A4 = { largura: 595.28, altura: 841.89 };
 
@@ -51,13 +51,13 @@ describe("carimbo de assinatura", () => {
     // fuso calculado pelo relógio oficial: Brasília -0300; horário de verão antigo (jan/2018) -0200; Amazonas -0400
     expect(fusoHorario(new Date("2018-01-10T12:00:00Z"))).toBe("-0200");
     expect(fusoHorario(new Date("2026-10-22T12:00:00Z"), "America/Manaus")).toBe("-0400");
-    const l = linhasCarimbo({ nome: "Suely Exemplo", data: new Date("2026-10-22T17:05:09Z"), codigo: "abc123", endereco: "https://sistema.exemplo.com.br/" });
+    const l = linhasCarimbo({ nome: "Suely Exemplo", data: new Date("2026-10-22T17:05:09Z"), codigo: "DJSD586588", endereco: "https://verifica.exemplo.com.br/" });
     expect(l).toEqual([
       "Documento assinado digitalmente",
       "SUELY EXEMPLO",
       "Data: 22/10/2026 14:05:09-0300",
       "art. 4º, I, da Lei nº 14.063/2020 e art. 10, § 2º, da MP nº 2.200-2/2001, com login e senha do signatário.",
-      "Verifique em https://sistema.exemplo.com.br/verificar/abc123",
+      "Verifique em https://verifica.exemplo.com.br/DJSD586588",
     ]);
     expect(linhasCarimbo({ nome: "Maria", codigo: "x" })[0]).toBe("Assinatura digital (prévia do lugar)");
   });
@@ -75,5 +75,14 @@ describe("posições de vários carimbos", () => {
     expect(emPontos(r.a!, A4).y).toBeCloseTo(302, 4);
     expect(r.b).toBeNull();
     expect(r.c).toEqual({ pagina: 0, x: 1 - CARIMBO.largura / A4.largura, y: 0.1 });
+  });
+});
+
+describe("código de verificação", () => {
+  it("aceita 4 letras (sem I e O) + 6 números", () => {
+    expect(FORMATO_CODIGO.test("DJSD586588")).toBe(true);
+    expect(FORMATO_CODIGO.test("DJSO586588")).toBe(false);
+    expect(FORMATO_CODIGO.test("DJS586588")).toBe(false);
+    expect(enderecoVerificacao({ codigo: "DJSD586588", endereco: "https://verifica.exemplo.com.br" })).toBe("https://verifica.exemplo.com.br/DJSD586588");
   });
 });

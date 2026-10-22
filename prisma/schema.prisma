@@ -591,6 +591,8 @@ model Documento {
   titulo                   String
   arquivoId                String
   hash                     String
+  /// Código impresso no carimbo e no QR Code (4 letras + 6 números, ex.: DJSD586588), gerado pelo banco.
+  codigoVerificacao        String       @unique @default(dbgenerated("gerar_codigo_verificacao()"))
   competencia              String?
   exigeAssinaturaEmpregado Boolean      @default(false)
   exigeAssinaturaCliente   Boolean      @default(false)

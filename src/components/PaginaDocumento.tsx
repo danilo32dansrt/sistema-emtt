@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { assinarDocumento } from "@/app/acoes-documentos";
 import { posicoesDosCarimbos, type PosicaoCarimbo } from "@/lib/assinatura/carimbo";
+import { baseVerificacao } from "@/lib/assinatura/endereco";
 import type { UsuarioLogado } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
 import { infoPdf } from "@/lib/pdf/carimbo";
@@ -50,7 +51,7 @@ export async function PaginaDocumento({ usuario, id }: { usuario: UsuarioLogado;
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {paginas.length ? (
-            <PosicionarCarimbos documentoId={id} urlPdf={`/api/documentos/${id}?original=1`} paginas={paginas} carimbos={carimbos} codigo={doc.id} endereco={process.env.APP_URL} />
+            <PosicionarCarimbos documentoId={id} urlPdf={`/api/documentos/${id}?original=1`} paginas={paginas} carimbos={carimbos} codigo={doc.codigoVerificacao} endereco={baseVerificacao()} />
           ) : (
             <object data={`/api/documentos/${id}`} type="application/pdf" className="h-[70vh] w-full rounded-2xl border border-slate-200 bg-white">
               <a className="text-marca-700 underline" href={`/api/documentos/${id}`}>Abrir o PDF</a>

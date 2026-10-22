@@ -104,15 +104,19 @@ export interface DadosCarimbo {
   nome: string;
   /** Data da assinatura; sem data, o carimbo é só a prévia do lugar. */
   data?: Date | null;
+  /** Código de verificação do documento (4 letras + 6 números, ex.: DJSD586588). */
   codigo: string;
-  /** Endereço do sistema (APP_URL), para a linha "Verifique em" e o QR Code. */
+  /** Endereço base da verificação (domínio próprio ou <sistema>/verificar), para "Verifique em" e o QR Code. */
   endereco?: string;
 }
 
-/** Endereço de verificação impresso no carimbo e gravado no QR Code: <sistema>/verificar/<código>. */
+/** Endereço de verificação impresso no carimbo e gravado no QR Code: <base>/<código>. */
 export function enderecoVerificacao(d: Pick<DadosCarimbo, "codigo" | "endereco">): string {
-  return `${(d.endereco ?? "").replace(/\/$/, "")}/verificar/${d.codigo}`;
+  return `${(d.endereco ?? "").replace(/\/$/, "")}/${d.codigo}`;
 }
+
+/** Formato do código de verificação: 4 letras (sem I e O) + 6 números. */
+export const FORMATO_CODIGO = /^[A-HJ-NP-Z]{4}\d{6}$/;
 
 /** Texto do carimbo, linha a linha (estilo de cada linha em ESTILO_LINHAS). */
 export function linhasCarimbo(d: DadosCarimbo): string[] {

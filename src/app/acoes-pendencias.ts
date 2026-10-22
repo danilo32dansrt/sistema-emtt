@@ -57,7 +57,7 @@ export async function resolverPendencia(_: EstadoAcao, fd: FormData): Promise<Es
       await prisma.tratamentoDia.upsert({ where: { empregadoId_data: { empregadoId: e.id, data } }, create: { empregadoId: e.id, data, tratamento, decididoPorId: u.id }, update: { tratamento, decididoPorId: u.id } });
       const txt = { ABONAR: "abonado (não será descontado)", COMPENSAR: "para compensar no mês", DESCONTAR: "descontado" }[tratamento];
       await registrarAtividade({ usuarioId: u.id, clienteId: e.clienteId, acao: "PONTO_TRATAMENTO", descricao: `Dia ${formatarData(data)} de ${e.nome}: ${txt}` });
-      await avisarEmpregada(e.id, { chave: `tratamento:${e.id}:${campo(fd, "data")}:${tratamento}`, titulo: `Dia ${formatarData(data)}: ${txt}`, texto: "Decisão do empregador sobre as horas que faltaram neste dia. Se não concordar, converse com ele ou fale com o consultor.", link: "/ponto/historico" });
+      await avisarEmpregada(e.id, { chave: `tratamento:${e.id}:${campo(fd, "data")}:${tratamento}`, titulo: `Dia ${formatarData(data)}: ${txt}`, texto: "Registro do empregador sobre as horas que faltaram neste dia. Já está no seu espelho do mês.", link: "/ponto/historico" });
       mensagem = `Dia ${formatarData(data)} ${txt}.`;
     } else if (tipo === "LANCAR_CONTRATO" || tipo === "COMPLETAR_SAIDA") {
       const e = await empregadoDoPatrao(u, campo(fd, "empregadoId"));
@@ -75,7 +75,7 @@ export async function resolverPendencia(_: EstadoAcao, fd: FormData): Promise<Es
         });
       }
       await registrarAtividade({ usuarioId: u.id, clienteId: e.clienteId, acao: "AJUSTE_PONTO", descricao: `${u.nome} lançou ${horas.join(", ")} no ponto de ${e.nome} em ${formatarData(data)}` });
-      await avisarEmpregada(e.id, { chave: `lancado:${e.id}:${campo(fd, "data")}`, titulo: `Seu ponto de ${formatarData(data)} foi lançado pelo empregador`, texto: `Horários: ${horas.join(", ")}. A marcação original (se houver) continua guardada. Se não estiver certo, peça o ajuste.`, link: "/ponto/historico" });
+      await avisarEmpregada(e.id, { chave: `lancado:${e.id}:${campo(fd, "data")}`, titulo: `Seu ponto de ${formatarData(data)} foi lançado pelo empregador`, texto: `Horários: ${horas.join(", ")}. Já está no seu espelho do mês.`, link: "/ponto/historico" });
       mensagem = `Lançado: ${horas.join(", ")}.`;
     } else if (tipo === "DECIDIR_AJUSTES") {
       const e = await empregadoDoPatrao(u, campo(fd, "empregadoId"));
@@ -83,7 +83,7 @@ export async function resolverPendencia(_: EstadoAcao, fd: FormData): Promise<Es
       const decisao = campo(fd, "decisao") === "APROVADO" ? "APROVADO" : "REJEITADO";
       const r = await prisma.ajustePonto.updateMany({ where: { empregadoId: e.id, data, status: "PENDENTE" }, data: { status: decisao, decididoPorId: u.id, decididoEm: new Date() } });
       await registrarAtividade({ usuarioId: u.id, clienteId: e.clienteId, acao: "AJUSTE_DECIDIDO", descricao: `${r.count} ajuste(s) de ${e.nome} em ${formatarData(data)} ${decisao === "APROVADO" ? "aprovado(s)" : "recusado(s)"}` });
-      await avisarEmpregada(e.id, { chave: `ajustes-decididos:${e.id}:${campo(fd, "data")}:${decisao}`, titulo: decisao === "APROVADO" ? "Ajuste do ponto aprovado" : "Ajuste do ponto não aprovado", texto: `Dia ${formatarData(data)}.${decisao === "REJEITADO" ? " Converse com seu empregador." : ""}`, link: "/ponto/historico" });
+      await avisarEmpregada(e.id, { chave: `ajustes-decididos:${e.id}:${campo(fd, "data")}:${decisao}`, titulo: decisao === "APROVADO" ? "Ajuste do ponto aprovado" : "Ajuste do ponto não aprovado", texto: `Dia ${formatarData(data)}.${decisao === "REJEITADO" ? " Vale o registro do empregador." : ""}`, link: "/ponto/historico" });
       mensagem = decisao === "APROVADO" ? "Ajuste aprovado." : "Ajuste recusado.";
     } else if (tipo === "DECIDIR_JUSTIFICATIVA") {
       const j = await prisma.justificativa.findUniqueOrThrow({ where: { id: campo(fd, "id") } });
@@ -92,7 +92,7 @@ export async function resolverPendencia(_: EstadoAcao, fd: FormData): Promise<Es
       const decisao = campo(fd, "decisao") === "APROVADO" ? "APROVADO" : "REJEITADO";
       await prisma.justificativa.update({ where: { id: j.id }, data: { status: decisao, decididoPorId: u.id, decididoEm: new Date() } });
       await registrarAtividade({ usuarioId: u.id, clienteId: e.clienteId, acao: "JUSTIFICATIVA_DECIDIDA", descricao: `Justificativa de ${e.nome} (${formatarData(j.data)}) ${decisao === "APROVADO" ? "aceita" : "recusada"}` });
-      await avisarEmpregada(e.id, { chave: `justificativa-decidida:${j.id}`, titulo: decisao === "APROVADO" ? "Justificativa aceita" : "Justificativa não aceita", texto: `Dia ${formatarData(j.data)}. ${decisao === "APROVADO" ? "O dia não será descontado." : "Converse com seu empregador."}`, link: "/ponto/justificativas" });
+      await avisarEmpregada(e.id, { chave: `justificativa-decidida:${j.id}`, titulo: decisao === "APROVADO" ? "Justificativa aceita" : "Justificativa não aceita", texto: `Dia ${formatarData(j.data)}. ${decisao === "APROVADO" ? "O dia não será descontado." : "O dia segue o registro do empregador."}`, link: "/ponto/justificativas" });
       mensagem = decisao === "APROVADO" ? "Justificativa aceita." : "Justificativa recusada.";
     } else if (tipo === "FECHAR_MES") {
       const e = await empregadoDoPatrao(u, campo(fd, "empregadoId"));

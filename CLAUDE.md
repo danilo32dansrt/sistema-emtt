@@ -111,7 +111,8 @@ valores em reais com 2 casas e datas dd/mm/aaaa.
   descontar", "abonar", "compensar" (só integral com acordo), "saiu no horário normal", aprovar/recusar pedidos e
   "confirmar o mês" (fecha o mês pelo ponto, com adiantamento opcional); empregada — "trabalhei no meu horário" /
   "saí às HH:MM" (pedido ao patrão) e "faltei — justificar". Decisões em `TratamentoDia`; nada é apagado e o outro
-  lado é avisado. Mês sem nenhuma marcação não é descontado: pede para informar o mês.
+  lado é avisado. **Decidido com o dono: sem botão "discordo" — parte-se do princípio de que todos informam o real;
+  o que o patrão lança passa a valer e os avisos à empregada são só informativos.** Mês sem nenhuma marcação não é descontado: pede para informar o mês.
 - eSocial: versão inicial gera o resumo de rubricas para lançamento manual; webservice direto é estudo futuro.
 
 ### 4.2 Ferramentas extras

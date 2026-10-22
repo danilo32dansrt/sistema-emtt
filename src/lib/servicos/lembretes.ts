@@ -227,6 +227,10 @@ export async function pendenciasDoPatrao(clienteId: string, agora = new Date()):
   const hoje = partesLocais(agora).data;
   const lista: PendenciaPatrao[] = [];
   const empregados = await buscarEmpregados({ clienteId }, hoje);
+  const local = await prisma.cliente.findUniqueOrThrow({ where: { id: clienteId }, select: { localLatitude: true } });
+  if (local.localLatitude === null && empregados.some((e) => e.pontoAtivo && e.exigirLocalizacao)) {
+    lista.push({ chave: `local-casa:${clienteId}`, para: "EMPREGADOR", link: "/cliente/local", acao: "Marcar o local da casa", urgente: true, titulo: "Marque o local da casa", texto: "Vá até o meio da casa e toque no botão: a empregada passa a marcar o ponto pelo GPS, só dentro da casa." });
+  }
   lista.push(...(await fechamentosComBotoes(empregados, hoje)));
   lista.push(...(await pedidosComBotoes(clienteId)));
   // DAE da competência anterior (vence dia 7): botão a partir de 5 dias antes até ser pago

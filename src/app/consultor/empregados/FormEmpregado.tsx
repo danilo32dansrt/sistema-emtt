@@ -87,7 +87,7 @@ export function FormEmpregado({ empregado, clientes, clienteId }: { empregado?: 
       <h3 className="pt-2 font-semibold text-slate-800">Aplicativo de ponto</h3>
       <div className="grid gap-2 sm:grid-cols-3">
         <Marcador rotulo="Usar ponto eletrônico" name="pontoAtivo" defaultChecked={empregado?.pontoAtivo} />
-        <Marcador rotulo="Exigir selfie na marcação" name="exigirSelfie" defaultChecked={empregado?.exigirSelfie ?? true} />
+        <Marcador rotulo="Exigir selfie na marcação (opcional — o padrão é o GPS da casa)" name="exigirSelfie" defaultChecked={empregado?.exigirSelfie ?? false} />
         <Marcador rotulo="Registrar localização na marcação" name="exigirLocalizacao" defaultChecked={empregado?.exigirLocalizacao ?? true} />
       </div>
       <AreaTexto rotulo="Observações" name="observacoes" defaultValue={empregado?.observacoes ?? ""} />

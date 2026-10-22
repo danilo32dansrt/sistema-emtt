@@ -25,6 +25,8 @@ export interface NovaMarcacao {
   latitude?: number | null;
   longitude?: number | null;
   precisaoMetros?: number | null;
+  distanciaMetros?: number | null;
+  foraDoLocal?: boolean;
   selfieArquivoId?: string | null;
   dispositivo?: string | null;
   ip?: string | null;
@@ -55,6 +57,8 @@ export async function registrarMarcacao(m: NovaMarcacao) {
         latitude: m.latitude ?? null,
         longitude: m.longitude ?? null,
         precisaoMetros: m.precisaoMetros ?? null,
+        distanciaMetros: m.distanciaMetros ?? null,
+        foraDoLocal: m.foraDoLocal ?? false,
         selfieArquivoId: m.selfieArquivoId ?? null,
         origem: m.origem,
         dispositivo: m.dispositivo?.slice(0, 250) ?? null,

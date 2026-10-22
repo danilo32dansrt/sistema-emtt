@@ -90,6 +90,8 @@ export function RelogioPonto({ marcacoesHoje, exigirSelfie, exigirLocalizacao, n
   const [ocupado, setOcupado] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: "ok" | "erro" | "aviso"; texto: string } | null>(null);
   const [comprovante, setComprovante] = useState<Comprovante | null>(null);
+  // Marcação barrada por estar fora da casa (GPS): ela pode confirmar que está na casa e registrar assim mesmo
+  const [foraDaCasa, setForaDaCasa] = useState<Pendente | null>(null);
   const [registradasAgora, setRegistradasAgora] = useState<{ tipo: Tipo; dataHora: string }[]>([]);
   const inputFoto = useRef<HTMLInputElement>(null);
   const tipoEscolhido = useRef<Tipo>("ENTRADA");
@@ -145,14 +147,15 @@ export function RelogioPonto({ marcacoesHoje, exigirSelfie, exigirLocalizacao, n
   const ultimo = todas.at(-1)?.tipo;
   const proximo: Tipo = !ultimo || ultimo === "SAIDA" ? "ENTRADA" : ORDEM[ORDEM.indexOf(ultimo) + 1];
 
-  async function marcar(tipo: Tipo, selfie: string | null) {
+  async function marcar(tipo: Tipo, selfie: string | null, confirmada?: Pendente) {
     setOcupado(true);
     setMensagem(null);
     setComprovante(null);
+    setForaDaCasa(null);
     try {
-      const instante = new Date().toISOString();
-      const pos = exigirLocalizacao ? await localizacao() : null;
-      const p: Pendente = {
+      const instante = confirmada?.dataHora ?? new Date().toISOString();
+      const pos = confirmada || !exigirLocalizacao ? null : await localizacao();
+      const p: Pendente = confirmada ?? {
         tipo,
         dataHora: instante,
         idLocal: crypto.randomUUID(),
@@ -164,18 +167,19 @@ export function RelogioPonto({ marcacoesHoje, exigirSelfie, exigirLocalizacao, n
       gravar(CHAVE_FILA, [...ler<Pendente[]>(CHAVE_FILA, []), p]);
       setRegistradasAgora((r) => [...r, { tipo, dataHora: instante }]);
       try {
-        const resp = await fetch("/api/ponto/marcar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...p, origem: "ONLINE" }) });
+        const resp = await fetch("/api/ponto/marcar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...p, origem: "ONLINE", registrarForaDoLocal: Boolean(confirmada) }) });
         const json = await resp.json();
         if (!resp.ok) {
           if (resp.status >= 500) throw new Error("servidor");
           gravar(CHAVE_FILA, ler<Pendente[]>(CHAVE_FILA, []).filter((x) => x.idLocal !== p.idLocal));
           setRegistradasAgora((r) => r.filter((x) => x.dataHora !== instante));
           setMensagem({ tipo: "erro", texto: json.erro ?? "Não foi possível registrar." });
+          if (json.foraDoLocal) setForaDaCasa(p);
         } else {
           gravar(CHAVE_FILA, ler<Pendente[]>(CHAVE_FILA, []).filter((x) => x.idLocal !== p.idLocal));
           gravar(CHAVE_COMPROVANTES, [json.comprovante, ...ler<Comprovante[]>(CHAVE_COMPROVANTES, [])].slice(0, 50));
           setComprovante(json.comprovante);
-          setMensagem({ tipo: "ok", texto: `${ROTULOS[tipo]} registrada às ${hora(instante)}.${pos || !exigirLocalizacao ? "" : " (Localização não autorizada.)"}` });
+          setMensagem({ tipo: "ok", texto: `${ROTULOS[tipo]} registrada às ${hora(instante)}.${confirmada ? " Ficou registrada como fora da casa e o patrão foi avisado." : pos || !exigirLocalizacao ? "" : " (Localização não autorizada.)"}` });
         }
       } catch {
         setMensagem({ tipo: "aviso", texto: `Sem internet: ${ROTULOS[tipo].toLowerCase()} guardada no celular às ${hora(instante)}. Será enviada automaticamente com o horário real.` });
@@ -226,6 +230,7 @@ export function RelogioPonto({ marcacoesHoje, exigirSelfie, exigirLocalizacao, n
       <button disabled={ocupado} onClick={() => iniciar(proximo)} className="flex min-h-24 w-full flex-col items-center justify-center rounded-3xl bg-emerald-600 text-2xl font-bold text-white shadow-lg active:scale-[0.99] disabled:bg-slate-400">
         {ocupado ? "Registrando..." : `Marcar ${ROTULOS[proximo].toLowerCase()}`}
         {exigirSelfie && !ocupado && <span className="text-sm font-normal">📷 com selfie</span>}
+        {!exigirSelfie && exigirLocalizacao && !ocupado && <span className="text-sm font-normal">📍 pelo GPS da casa</span>}
       </button>
       <details className="rounded-2xl border border-slate-200 bg-white p-3">
         <summary className="cursor-pointer text-sm font-semibold text-slate-700">Marcar outro tipo</summary>
@@ -241,6 +246,12 @@ export function RelogioPonto({ marcacoesHoje, exigirSelfie, exigirLocalizacao, n
       {mensagem && (
         <div role="status" className={`rounded-2xl border p-4 ${mensagem.tipo === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : mensagem.tipo === "erro" ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
           {mensagem.texto}
+          {foraDaCasa && (
+            <button type="button" disabled={ocupado} onClick={() => marcar(foraDaCasa.tipo, foraDaCasa.selfie, foraDaCasa)} className="mt-3 block min-h-12 w-full rounded-xl border border-red-300 bg-white px-4 font-semibold text-red-800">
+              Estou na casa — registrar mesmo assim
+            </button>
+          )}
+          {foraDaCasa && <span className="mt-2 block text-xs">O patrão será avisado de que a marcação foi feita fora do local cadastrado.</span>}
         </div>
       )}
 

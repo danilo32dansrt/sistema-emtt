@@ -235,6 +235,11 @@ model Cliente {
   mensalidade        Decimal          @db.Decimal(12, 2)
   diaVencimento      Int              @default(10)
   plano              PlanoCliente     @default(BASICO)
+  /// Local de trabalho (a casa), marcado pelo patrão no app; a empregada só marca o ponto dentro do raio
+  localLatitude      Float?
+  localLongitude     Float?
+  localRaioMetros    Int              @default(10)
+  localDefinidoEm    DateTime?
   procuracaoStatus   StatusProcuracao @default(PENDENTE)
   procuracaoValidade DateTime?        @db.Date
   observacoes        String?
@@ -295,7 +300,7 @@ model Empregado {
   estabilidadeAte           DateTime?         @db.Date
   estabilidadeMotivo        String?
   pontoAtivo                Boolean           @default(false)
-  exigirSelfie              Boolean           @default(true)
+  exigirSelfie              Boolean           @default(false)
   exigirLocalizacao         Boolean           @default(true)
   observacoes               String?
   criadoEm                  DateTime          @default(now())
@@ -444,6 +449,9 @@ model MarcacaoPonto {
   selfieArquivoId String?
   /// "ONLINE" ou "OFFLINE"
   origem          String       @default("ONLINE")
+  /// Distância até o local da casa no momento da marcação (GPS) e se estava fora do raio
+  distanciaMetros Float?
+  foraDoLocal     Boolean      @default(false)
   dispositivo     String?
   ip              String?
   /// Identificador gerado no aparelho (evita duplicar na sincronização offline)

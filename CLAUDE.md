@@ -91,6 +91,10 @@ valores em reais com 2 casas e datas dd/mm/aaaa.
   AFD e AEJ, espelho mensal e assinatura eletrônica. **Para comercializar como REP-P: registro no INPI, atestado técnico e termo de responsabilidade.**
 - CLT subsidiária: tolerância 5 min por marcação / 10 min por dia; faltas justificadas (art. 473); intervalo de 15 min para jornadas de 4h a 6h.
 - LGPD: selfie, biometria e geolocalização só no momento da marcação, nunca rastreamento; informar a finalidade e registrar a ciência.
+- **Ponto pelo GPS da casa (em vez de selfie — decisão do dono):** o patrão marca o meio da casa em `/cliente/local`
+  (raio padrão 10 m, opções 10/20/30/50/100). A marcação feita na hora fora do raio (somando a precisão do GPS, até 30 m)
+  é barrada com a distância; ela pode confirmar "estou na casa" e a marcação entra sinalizada (`foraDoLocal`) com aviso
+  ao patrão. Marcações offline nunca são barradas (entram sinalizadas). Selfie fica opcional por empregado.
 - Guarda dos registros por pelo menos 5 anos, com acesso garantido ao empregado.
 - Regimes: integral (8h/44h); parcial (25h, extra de 1h/dia com acordo, até 6h/dia); 12x36 (acordo escrito; feriados e DSR compensados); viagem (adicional mínimo de 25%); experiência até 90 dias.
 - Cálculos: extra 50%; domingo/feriado não compensado em dobro; banco de horas (40h pagas no mês salvo compensação; excedente compensável em 1 ano; só com acordo); intervalo 1h–2h (30 min com acordo; fracionável para quem reside) e intervalo suprimido pago com 50%; interjornada 11h; DSR 24h; noturno 22h–5h com hora de 52min30s e adicional de 20%; faltas descontam também o DSR; justificadas com comprovante não descontam; bloquear/alertar limites do regime.

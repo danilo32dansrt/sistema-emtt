@@ -23,6 +23,7 @@ export default async function LayoutCliente({ children }: { children: React.Reac
         { href: "/cliente/dae", rotulo: "DAE e pagamentos", icone: "🧾" },
         { href: "/cliente/documentos", rotulo: "Documentos", icone: "📄", contador: assinar },
         { href: "/cliente/ponto", rotulo: "Ponto", icone: "⏱️", contador: ponto },
+        { href: "/cliente/local", rotulo: "Local da casa (GPS)", icone: "📍" },
         { href: "/cliente/disciplinar", rotulo: "Gestão disciplinar", icone: "⚖️" },
         { href: "/cliente/simuladores", rotulo: "Simuladores", icone: "📊" },
         { href: "/cliente/custos", rotulo: "Painel de custos", icone: "💹" },

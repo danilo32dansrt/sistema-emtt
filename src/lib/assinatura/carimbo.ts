@@ -86,11 +86,18 @@ export function posicaoPadrao(papel: PapelSignatario, ordem: number, locais: Loc
   return limitarPosicao({ pagina: l.pagina, x: centro / t.largura, y: (t.altura - topoPt) / t.altura }, paginas);
 }
 
+/** Diferença para o UTC no horário de Brasília naquela data, calculada pelo relógio oficial (ex.: "-0300"). */
+export function fusoHorario(d: Date, zona = "America/Sao_Paulo"): string {
+  const nome = new Intl.DateTimeFormat("en-US", { timeZone: zona, timeZoneName: "longOffset" }).formatToParts(d).find((x) => x.type === "timeZoneName")?.value ?? "";
+  const m = /GMT([+-])(\d{2}):?(\d{2})?/.exec(nome);
+  return m ? `${m[1]}${m[2]}${m[3] ?? "00"}` : "+0000";
+}
+
 /** Data e hora de Brasília no formato do carimbo: 22/10/2026 14:05:09-0300. */
 export function dataHoraCarimbo(d: Date): string {
   const p = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(d);
   const v = (t: string) => p.find((x) => x.type === t)?.value ?? "";
-  return `${v("day")}/${v("month")}/${v("year")} ${v("hour")}:${v("minute")}:${v("second")}-0300`;
+  return `${v("day")}/${v("month")}/${v("year")} ${v("hour")}:${v("minute")}:${v("second")}${fusoHorario(d)}`;
 }
 
 export interface DadosCarimbo {

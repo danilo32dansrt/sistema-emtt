@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CARIMBO, dataHoraCarimbo, emPontos, limitarPosicao, linhasCarimbo, papelDaLinha, posicaoPadrao, posicoesDosCarimbos, type LocalAssinatura } from "./carimbo";
+import { CARIMBO, dataHoraCarimbo, fusoHorario, emPontos, limitarPosicao, linhasCarimbo, papelDaLinha, posicaoPadrao, posicoesDosCarimbos, type LocalAssinatura } from "./carimbo";
 
 const A4 = { largura: 595.28, altura: 841.89 };
 
@@ -48,6 +48,9 @@ describe("carimbo de assinatura", () => {
 
   it("escreve data e hora de Brasília e as linhas do carimbo", () => {
     expect(dataHoraCarimbo(new Date("2026-10-22T17:05:09Z"))).toBe("22/10/2026 14:05:09-0300");
+    // fuso calculado pelo relógio oficial: Brasília -0300; horário de verão antigo (jan/2018) -0200; Amazonas -0400
+    expect(fusoHorario(new Date("2018-01-10T12:00:00Z"))).toBe("-0200");
+    expect(fusoHorario(new Date("2026-10-22T12:00:00Z"), "America/Manaus")).toBe("-0400");
     const l = linhasCarimbo({ nome: "Suely Exemplo", data: new Date("2026-10-22T17:05:09Z"), codigo: "abc123", endereco: "https://sistema.exemplo.com.br/" });
     expect(l).toEqual([
       "Documento assinado digitalmente",

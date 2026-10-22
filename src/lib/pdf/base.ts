@@ -1,4 +1,5 @@
-import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFFont, PDFHexString, PDFName, PDFPage, rgb, StandardFonts } from "pdf-lib";
+import type { LocalAssinatura } from "@/lib/assinatura/carimbo";
 
 /** Troca caracteres que as fontes padrão do PDF (WinAnsi) não suportam. */
 export function textoSeguro(t: string): string {
@@ -15,6 +16,14 @@ export function textoSeguro(t: string): string {
 }
 
 const A4: [number, number] = [595.28, 841.89];
+/** Entrada nas propriedades do PDF onde ficam as linhas de assinatura (lida ao montar o PDF assinado). */
+export const CHAVE_LOCAIS = "LocaisAssinatura";
+
+/** Dicionário de propriedades do PDF (título, autor...), onde também gravamos as linhas de assinatura. */
+export function propriedadesPdf(doc: PDFDocument): PDFDict | undefined {
+  const ref = doc.context.trailerInfo.Info;
+  return ref ? doc.context.lookup(ref, PDFDict) : undefined;
+}
 const MARGEM = 50;
 
 /** Pequeno "editor" de PDF: títulos, parágrafos com quebra automática, tabelas e assinaturas. */
@@ -25,6 +34,8 @@ export class DocPdf {
   private negrito!: PDFFont;
   private y = 0;
   private numeroPaginas = 0;
+  /** Linhas de assinatura desenhadas: viram o lugar inicial do carimbo de cada signatário. */
+  private locais: LocalAssinatura[] = [];
 
   constructor(private readonly cabecalho: { titulo: string; subtitulo?: string; rodape?: string }) {}
 
@@ -164,6 +175,7 @@ export class DocPdf {
     nomes.forEach((n, i) => {
       const x = MARGEM + i * w + 10;
       this.pagina.drawLine({ start: { x, y: this.y }, end: { x: x + w - 20, y: this.y }, thickness: 0.6 });
+      this.locais.push({ pagina: this.numeroPaginas - 1, x, y: this.y, largura: w - 20, papel: n.papel });
       this.pagina.drawText(textoSeguro(n.nome).slice(0, 45), { x, y: this.y - 12, size: 9, font: this.negrito });
       this.pagina.drawText(textoSeguro(n.papel), { x, y: this.y - 23, size: 8, font: this.fonte });
     });
@@ -177,31 +189,7 @@ export class DocPdf {
   }
 
   async salvar(): Promise<Uint8Array> {
+    if (this.locais.length) propriedadesPdf(this.doc)?.set(PDFName.of(CHAVE_LOCAIS), PDFHexString.fromText(JSON.stringify(this.locais)));
     return this.doc.save();
   }
-}
-
-/** Acrescenta uma página de "manifesto de assinaturas eletrônicas" ao final de um PDF existente. */
-export async function anexarManifesto(pdf: Uint8Array, assinaturas: { nome: string; papel: string; data: Date; ip?: string | null; hash: string }[], codigo: string) {
-  const doc = await PDFDocument.load(pdf);
-  const fonte = await doc.embedFont(StandardFonts.Helvetica);
-  const negrito = await doc.embedFont(StandardFonts.HelveticaBold);
-  const p = doc.addPage(A4);
-  let y = A4[1] - MARGEM;
-  const linha = (t: string, f = fonte, tam = 10) => {
-    p.drawText(textoSeguro(t), { x: MARGEM, y: y - tam, size: tam, font: f });
-    y -= tam + 6;
-  };
-  linha("Registro de assinaturas eletrônicas", negrito, 14);
-  linha("Assinatura eletrônica simples (Lei 14.063/2020, art. 4º, I), com identificação do signatário, data, hora e endereço IP.", fonte, 8);
-  y -= 6;
-  for (const a of assinaturas) {
-    linha(`${a.nome} (${a.papel})`, negrito);
-    linha(`Assinado em ${a.data.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}${a.ip ? ` — IP ${a.ip}` : ""}`);
-    linha(`Hash SHA-256 do documento assinado: ${a.hash}`, fonte, 7);
-    y -= 4;
-  }
-  y -= 10;
-  linha(`Código de verificação: ${codigo}`, negrito, 9);
-  return doc.save();
 }

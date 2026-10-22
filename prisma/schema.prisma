@@ -96,6 +96,7 @@ model Usuario {
   atividades  Atividade[]
   mensagens   Mensagem[]
   assinaturas Assinatura[]
+  posicoesCarimbo PosicaoCarimbo[]
   inscricoesPush InscricaoPush[]
   notificacoes   Notificacao[]
 
@@ -598,6 +599,7 @@ model Documento {
   criadoPorId              String?
   criadoEm                 DateTime     @default(now())
   assinaturas              Assinatura[]
+  posicoesCarimbo          PosicaoCarimbo[]
 
   @@index([clienteId, criadoEm])
   @@index([empregadoId])
@@ -616,6 +618,22 @@ model Assinatura {
   ip            String?
   userAgent     String?
   hashDocumento String
+
+  @@unique([documentoId, usuarioId])
+}
+
+/// Lugar do carimbo de assinatura na página, escolhido pelo signatário arrastando (só visual: não muda o PDF nem o hash).
+/// Frações da página (0 a 1) a partir do canto superior esquerdo; página começa em 0.
+model PosicaoCarimbo {
+  id           String    @id @default(cuid())
+  documentoId  String
+  documento    Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  usuarioId    String
+  usuario      Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  pagina       Int
+  x            Float
+  y            Float
+  atualizadoEm DateTime  @updatedAt
 
   @@unique([documentoId, usuarioId])
 }

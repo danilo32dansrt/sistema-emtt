@@ -126,7 +126,9 @@ adia por 1 hora. No celular, as notificações com botão ficam fixas na tela at
 rápido não aciona) e na hora: os patrões e a consultoria recebem um alerta urgente (vibra forte e fica fixo na tela), com a
 localização; o celular dela começa a gravar o áudio (enviado a cada 15 segundos, por até 10 minutos) e mostra os botões
 para ligar 192, 193 e 190. Quem tocar em **Estou indo** faz aparecer na tela dela "Fulano está indo". Enquanto ninguém
-responder, o alerta se repete. As gravações ficam na página da emergência, só para os patrões e a consultoria.
+responder, o celular dos patrões e da consultoria **toca de novo a cada 30 segundos**; com o app aberto, toca uma
+**sirene sem parar** até alguém apertar um botão. O "Estou indo" pode ser tocado direto na notificação, com o celular bloqueado.
+As pendências comuns também fazem som (um "plim" a cada 20 segundos) até a pessoa apertar um botão do alerta. As gravações ficam na página da emergência, só para os patrões e a consultoria.
 
 1. Chaves das notificações: **não precisa fazer nada** — o sistema gera sozinho no primeiro uso e guarda no banco.
    (Opcional: para usar as suas, gere com `npx web-push generate-vapid-keys` e coloque `VAPID_PUBLIC_KEY`,

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { salvarBytes, TAMANHO_MAXIMO } from "@/lib/arquivos";
 import { usuarioAtual } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/db";
+import { insistirNoSos } from "@/lib/servicos/emergencia";
 
 /** Recebe um trecho de áudio (~15 s) gravado durante o SOS. Só a própria empregada, só enquanto a emergência está aberta. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const ordem = await prisma.emergenciaTrecho.count({ where: { emergenciaId: id } });
   const arq = await salvarBytes(dados, { nome: `sos-${id}-${ordem + 1}.${mime.includes("mp4") ? "m4a" : "webm"}`, mime, clienteId: em.clienteId, criadoPorId: u.id });
   await prisma.emergenciaTrecho.create({ data: { emergenciaId: id, arquivoId: arq.id, ordem: ordem + 1 } });
+  await insistirNoSos(id, ordem + 1);
   return NextResponse.json({ ok: true, ordem: ordem + 1, status: em.status, atendidaPor: em.atendidaPor });
 }
 

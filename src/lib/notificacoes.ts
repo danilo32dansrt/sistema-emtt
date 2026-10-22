@@ -63,7 +63,13 @@ export async function notificar(usuarioId: string, a: Aviso): Promise<boolean> {
     if (e instanceof Error && e.message.includes("Unique constraint")) return false;
     throw e;
   }
-  if (!(await pushDisponivel())) return true;
+  await enviarPush(usuarioId, a);
+  return true;
+}
+
+/** Manda a notificação aos celulares do usuário (sem gravar na lista de avisos). */
+async function enviarPush(usuarioId: string, a: Aviso): Promise<void> {
+  if (!(await pushDisponivel())) return;
   const inscricoes = await prisma.inscricaoPush.findMany({ where: { usuarioId } });
   // A tag agrupa repetições do mesmo lembrete: a notificação nova substitui a anterior no celular
   const corpo = JSON.stringify({ titulo: a.titulo, texto: a.texto, link: a.link ?? "/", tag: a.urgente ? a.chave : a.chave.split(":").slice(0, 3).join(":"), acao: a.acao, urgente: a.urgente });
@@ -79,7 +85,14 @@ export async function notificar(usuarioId: string, a: Aviso): Promise<boolean> {
       }
     }),
   );
-  return true;
+}
+
+/**
+ * Faz o celular tocar de novo o mesmo aviso (mesma etiqueta: substitui a notificação e toca/vibra outra vez),
+ * sem repetir na lista de avisos. Usado no SOS enquanto ninguém responde.
+ */
+export async function tocarDeNovo(usuarioIds: string[], a: Aviso): Promise<void> {
+  await Promise.all(usuarioIds.map((id) => enviarPush(id, a).catch((e) => console.error("Falha ao repetir o aviso", e))));
 }
 
 /** Avisa todos os usuários ativos de um papel/cliente (ex.: os patrões de um cliente). */

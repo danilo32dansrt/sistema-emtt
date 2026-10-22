@@ -1,7 +1,7 @@
 import "server-only";
 import { registrarAtividade } from "@/lib/atividade";
 import { prisma } from "@/lib/db";
-import { notificarVarios } from "@/lib/notificacoes";
+import { notificarVarios, tocarDeNovo } from "@/lib/notificacoes";
 import type { OpcaoPendencia, PendenciaComAcoes } from "@/lib/servicos/lembretes";
 
 /**
@@ -50,6 +50,20 @@ export async function encerrarEmergencia(id: string, usuarioId: string) {
   return em;
 }
 
+/**
+ * Enquanto o celular dela grava (trechos a cada 15 s), o SOS sem resposta faz os celulares dos patrões e do
+ * consultor tocarem de novo a cada 30 s — o som não para até alguém tocar em "Estou indo".
+ */
+export async function insistirNoSos(id: string, ordemTrecho: number) {
+  if (ordemTrecho % 2) return;
+  const em = await prisma.emergencia.findUnique({ where: { id }, include: { empregado: { select: { nome: true } } } });
+  if (!em || em.status !== "ATIVA") return;
+  const nome = em.empregado.nome.split(" ")[0];
+  const { patroes, consultores } = await destinatarios(em.clienteId);
+  const segundos = Math.round((Date.now() - em.iniciadaEm.getTime()) / 1000);
+  await tocarDeNovo([...patroes, ...consultores], { chave: `sos:${em.id}:0`, titulo: `🚨 EMERGÊNCIA — ${nome} pediu ajuda (sem resposta há ${Math.floor(segundos / 60)} min ${segundos % 60} s)`, texto: `Toque em "Estou indo" para parar o alarme.${mapa(em.latitude, em.longitude)}`, link: `/emergencia/${em.id}`, acao: "Estou indo", urgente: true });
+}
+
 /** Rotina frequente: SOS sem resposta continua avisando os patrões (a cada execução, ~10 min). */
 export async function repetirEmergenciasSemResposta(agora = new Date()) {
   let n = 0;
@@ -81,7 +95,8 @@ export async function alertasDeEmergencia(filtro: { clienteId?: string }): Promi
     return {
       chave: `sos:${em.id}`,
       para: "EMPREGADOR",
-      urgente: true,
+      // Alarme (tela vermelha e sirene) enquanto ninguém respondeu; depois do "Estou indo" vira pendência comum
+      urgente: em.status === "ATIVA",
       titulo: `🚨 EMERGÊNCIA — ${nome} pediu ajuda às ${hora}`,
       texto: em.status === "ATENDIDA" ? `${em.atendidaPor} respondeu que está indo. Encerre quando estiver resolvido.` : `${nome} acionou o SOS${filtro.clienteId ? "" : ` (${em.empregado.cliente.nome})`} e precisa de alguém na casa imediatamente. Ninguém respondeu ainda.`,
       link: `/emergencia/${em.id}`,

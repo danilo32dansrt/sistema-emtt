@@ -1,6 +1,6 @@
 /* Service worker do aplicativo de ponto: permite abrir o app sem internet.
    As marcações offline ficam guardadas no aparelho e são enviadas pelo app quando a conexão volta. */
-const VERSAO = "ponto-v3";
+const VERSAO = "ponto-v4";
 const ESSENCIAIS = ["/ponto", "/ponto/historico", "/ponto/justificativas", "/manifest.webmanifest", "/icone.svg"];
 
 self.addEventListener("install", (evento) => {
@@ -65,9 +65,10 @@ self.addEventListener("push", (evento) => {
       renotify: Boolean(dados.tag),
       // Pendência (tem botão que resolve) e SOS ficam fixos na tela até a pessoa tocar
       requireInteraction: Boolean(dados.urgente || dados.acao),
+      silent: false,
       vibrate: dados.urgente ? [600, 200, 600, 200, 600, 200, 600] : [200, 100, 200],
       actions: dados.acao ? [{ action: "abrir", title: dados.acao }] : [],
-      data: { link: dados.link || "/" },
+      data: { link: dados.link || "/", sos: dados.urgente && /^\/emergencia\/[\w-]+$/.test(dados.link || "") ? dados.link.split("/")[2] : null },
     }),
   );
 });
@@ -75,8 +76,11 @@ self.addEventListener("push", (evento) => {
 self.addEventListener("notificationclick", (evento) => {
   evento.notification.close();
   const link = (evento.notification.data && evento.notification.data.link) || "/";
+  const sos = evento.notification.data && evento.notification.data.sos;
+  // "Estou indo" no próprio aviso do SOS já responde (para o alarme e avisa a empregada) antes de abrir o app
+  const responder = sos && evento.action === "abrir" ? fetch(`/api/emergencia/${sos}/atender`, { method: "POST", credentials: "same-origin" }).catch(() => undefined) : Promise.resolve();
   evento.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+    responder.then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
       for (const j of janelas) {
         if ("focus" in j) {
           j.navigate(link).catch(() => undefined);
@@ -84,6 +88,6 @@ self.addEventListener("notificationclick", (evento) => {
         }
       }
       return self.clients.openWindow(link);
-    }),
+    })),
   );
 });

@@ -8,6 +8,8 @@ import { registrarAtividade } from "@/lib/atividade";
 import { exigirConsultor } from "@/lib/auth/sessao";
 import { ETAPAS_CHECKLIST, formatarCompetencia, formatarMoeda, semanasDistintas } from "@/lib/calculos";
 import { prisma } from "@/lib/db";
+import { codigoBarrasValido } from "@/lib/inter/plus";
+import { aoEmitirDae } from "@/lib/servicos/plano-plus";
 import { dadosDoForm, moeda, textoOpcional } from "@/lib/formularios";
 import { esquemaLancamento, lerDatasFaltas } from "@/lib/servicos/lancamento";
 
@@ -48,8 +50,12 @@ export async function salvarDae(_: EstadoAcao, fd: FormData): Promise<EstadoAcao
       await prisma.documento.create({ data: { clienteId: emp.clienteId, empregadoId: emp.id, tipo: "DAE", titulo: `DAE ${formatarCompetencia(d.ano, d.mes)}`, arquivoId: arquivo.id, hash: arquivo.sha256, competencia: formatarCompetencia(d.ano, d.mes), criadoPorId: u.id } });
     }
     await registrarAtividade({ usuarioId: u.id, clienteId: emp.clienteId, acao: "DAE_EMITIDO", descricao: `DAE ${formatarCompetencia(d.ano, d.mes)} de ${emp.nome}: ${formatarMoeda(d.daeValor)}` });
+    // Plano Plus: o DAE entra na cobrança única do cliente (e a cobrança sai quando todos estiverem prontos)
+    const plus = await aoEmitirDae(emp.id, d.ano, d.mes).catch((e: unknown) => ({ aviso: e instanceof Error ? e.message : "" }));
+    if (plus && !codigoBarrasValido(d.daeCodigo)) plus.aviso = "Plano Plus: informe o código de barras completo do DAE (44 a 48 números) para a consultoria poder pagá-lo.";
     revalidatePath("/consultor/rotina");
-    return { ok: true, mensagem: "DAE registrado." };
+    revalidatePath("/consultor/financeiro");
+    return { ok: true, mensagem: `DAE registrado.${plus?.aviso ? ` ${plus.aviso}` : ""}` };
   } catch (e) {
     return erroParaEstado(e);
   }

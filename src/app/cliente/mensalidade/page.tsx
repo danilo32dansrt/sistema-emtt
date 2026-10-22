@@ -21,7 +21,7 @@ export default async function Mensalidade() {
       // Cobrança do Banco Inter: Pix com baixa automática + boleto
       if (m.pixCopiaECola && cobrancaAtiva(m.interSituacao)) return { id: m.id, codigo: m.pixCopiaECola, qr: await QRCode.toDataURL(m.pixCopiaECola, { margin: 1, width: 240 }), inter: true };
       if (!cfg.chavePix) return null;
-      const codigo = gerarPixCopiaECola({ chave: cfg.chavePix, nome: cfg.nomePix ?? cfg.nomeConsultoria, cidade: cfg.cidadePix ?? cfg.cidade ?? "BRASIL", valor: num(m.valor), txid: m.txid ?? `MENS${m.ano}${String(m.mes).padStart(2, "0")}`, descricao: `Mensalidade ${formatarCompetencia(m.ano, m.mes)}` });
+      const codigo = gerarPixCopiaECola({ chave: cfg.chavePix, nome: cfg.nomePix ?? cfg.nomeConsultoria, cidade: cfg.cidadePix ?? cfg.cidade ?? "BRASIL", valor: num(m.valor) + num(m.valorDae), txid: m.txid ?? `MENS${m.ano}${String(m.mes).padStart(2, "0")}`, descricao: `Mensalidade ${formatarCompetencia(m.ano, m.mes)}` });
       return { id: m.id, codigo, qr: await QRCode.toDataURL(codigo, { margin: 1, width: 240 }), inter: false };
     }),
   );
@@ -31,7 +31,8 @@ export default async function Mensalidade() {
       {!cfg.chavePix && !abertas.some((m) => m.pixCopiaECola) && abertas.length > 0 && <div className="mb-4"><Aviso tipo="aviso">O consultor ainda não cadastrou a chave Pix. Fale com ele pelo chat.</Aviso></div>}
       <div className="space-y-4">
         {abertas.map((m, i) => (
-          <Cartao key={m.id} titulo={`${formatarCompetencia(m.ano, m.mes)} — ${formatarMoeda(num(m.valor))}`}>
+          <Cartao key={m.id} titulo={`${formatarCompetencia(m.ano, m.mes)} — ${formatarMoeda(num(m.valor) + num(m.valorDae))}`}>
+            {num(m.valorDae) > 0 && <p className="mb-2 text-sm text-slate-700">Mensalidade {formatarMoeda(num(m.valor))} + DAE {formatarMoeda(num(m.valorDae))}. <b>Com este pagamento a consultoria paga o DAE por você.</b></p>}
             <p className="mb-3 text-sm">Vencimento {formatarData(m.vencimento)} {m.vencimento < hoje ? <Selo cor="vermelho">atrasada</Selo> : <Selo cor="amarelo">em aberto</Selo>}</p>
             {pix[i] && (
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
@@ -56,7 +57,7 @@ export default async function Mensalidade() {
         {!abertas.length && <Vazio>Nenhuma mensalidade em aberto. Obrigado! 🎉</Vazio>}
         <Cartao titulo="Histórico">
           <ul className="space-y-1 text-sm">
-            {lista.map((m) => <li key={m.id} className="flex justify-between"><span>{formatarCompetencia(m.ano, m.mes)} — {formatarMoeda(num(m.valor))}</span><Selo cor={m.status === "PAGO" ? "verde" : "amarelo"}>{m.status === "PAGO" ? `pago ${m.pagoEm ? formatarData(m.pagoEm) : ""}` : "aberto"}</Selo></li>)}
+            {lista.map((m) => <li key={m.id} className="flex justify-between"><span>{formatarCompetencia(m.ano, m.mes)} — {formatarMoeda(num(m.valor) + num(m.valorDae))}</span><Selo cor={m.status === "PAGO" ? "verde" : "amarelo"}>{m.status === "PAGO" ? `pago ${m.pagoEm ? formatarData(m.pagoEm) : ""}` : "aberto"}</Selo></li>)}
           </ul>
         </Cartao>
       </div>

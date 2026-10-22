@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { data, instanteLocal, intervaloMinimo, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, type DiaPonto } from "..";
+import { data, instanteLocal, intervaloMinimo, lembretesCobrancaPlus, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, type DiaPonto } from "..";
 
 const qua = data(2026, 3, 4);
 const ter = data(2026, 3, 3);
@@ -105,5 +105,17 @@ describe("lembretes do consultor", () => {
   it("nada fora do horário comercial e nada sem pendência", () => {
     expect(em(data(2026, 4, 7), "22:00", { daesParaEmitir: 3 })).toEqual([]);
     expect(em(data(2026, 4, 7), "10:00", {})).toEqual([]);
+  });
+});
+
+describe("plano Plus — cobrança do mês", () => {
+  const venc = data(2026, 11, 5);
+  const em = (d: Date, h: string) => lembretesCobrancaPlus({ agora: instanteLocal(d, h), vencimento: venc, total: "R$ 372,89" }).map((l) => l.titulo);
+  it("lembra na véspera, no dia e depois, a cada hora em horário comercial", () => {
+    expect(em(data(2026, 11, 3), "10:00")).toEqual([]);
+    expect(em(data(2026, 11, 4), "10:00")).toEqual(["Amanhã vence a cobrança do mês"]);
+    expect(em(data(2026, 11, 5), "10:00")).toEqual(["Hoje vence a cobrança do mês"]);
+    expect(em(data(2026, 11, 6), "10:00")).toEqual(["Cobrança do mês em atraso"]);
+    expect(em(data(2026, 11, 6), "22:00")).toEqual([]);
   });
 });

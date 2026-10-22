@@ -203,3 +203,22 @@ export function lembretesConsultor(s: SituacaoConsultor): Lembrete[] {
   if (s.mensagensNaoLidas) lista.push({ ...base, chave: `mensagens:${d}:${j}`, titulo: `${s.mensagensNaoLidas} mensagem(ns) de clientes`, texto: "Há clientes esperando resposta no chat.", link: "/consultor/mensagens", acao: "Responder" });
   return lista;
 }
+
+/**
+ * Plano Plus: cobrança do mês (mensalidade + DAE) ainda não paga. Na véspera e depois do vencimento,
+ * lembra o patrão a cada hora (horário comercial) — sem esse pagamento a consultoria não paga o DAE.
+ */
+export function lembretesCobrancaPlus(e: { agora: Date; vencimento: Date; total: string; repetirMinutos?: number; horarioComercial?: { inicio: number; fim: number } }): Lembrete[] {
+  const local = partesLocais(e.agora);
+  const c = e.horarioComercial ?? HORARIO_COMERCIAL_PADRAO;
+  const dias = diferencaDias(local.data, e.vencimento);
+  if (dias > 1 || local.minutos < c.inicio || local.minutos >= c.fim) return [];
+  return [{
+    chave: `plus-cobranca:${iso(e.vencimento)}:${janela(e.agora, e.repetirMinutos ?? 60)}`,
+    para: "EMPREGADOR",
+    titulo: dias < 0 ? "Cobrança do mês em atraso" : dias === 0 ? "Hoje vence a cobrança do mês" : "Amanhã vence a cobrança do mês",
+    texto: `Mensalidade + DAE: ${e.total}. Com o pagamento, a consultoria paga o DAE por você${dias < 0 ? "; sem ele, o DAE atrasa e gera multa" : ""}.`,
+    link: "/cliente/mensalidade",
+    acao: "Pagar agora",
+  }];
+}

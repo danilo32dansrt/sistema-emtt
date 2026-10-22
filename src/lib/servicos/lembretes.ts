@@ -2,7 +2,7 @@ import "server-only";
 import type { Afastamento, Empregado, Ferias, Justificativa } from "@prisma/client";
 import {
   addDias, competenciaAnterior, DIAS_SEMANA, diaSemana, diferencaDias, ehDiaDeTrabalho12x36, ehFeriado, formatarCompetencia, formatarData, formatarMoeda,
-  hojeBrasil, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, situacaoChecklist, ultimoDiaMes, partesLocais, vencimentoDae, type DiaPonto, type Lembrete,
+  hojeBrasil, lembretesCobrancaPlus, lembretesConsultor, lembretesDae, lembretesPedidosPendentes, lembretesPonto, situacaoChecklist, ultimoDiaMes, partesLocais, vencimentoDae, type DiaPonto, type Lembrete,
 } from "@/lib/calculos";
 import { horariosDoEmpregado, jornadaDoEmpregado, num } from "@/lib/conversao";
 import { prisma } from "@/lib/db";
@@ -97,7 +97,18 @@ export async function pendenciasDoPatrao(clienteId: string, agora = new Date()):
   const comp = competenciaAnterior(hoje.getUTCFullYear(), hoje.getUTCMonth() + 1);
   const venc = vencimentoDae(comp.ano, comp.mes);
   const dias = diferencaDias(hoje, venc);
-  const competencias = await prisma.competencia.findMany({ where: { ano: comp.ano, mes: comp.mes, daeEmitido: true, pagamentoConfirmado: false, clienteInformouPagamentoEm: null, empregado: { clienteId } }, include: { empregado: { select: { nome: true } } } });
+  const cliente = await prisma.cliente.findUniqueOrThrow({ where: { id: clienteId }, select: { plano: true } });
+  // Plano Plus: o patrão paga uma cobrança só (mensalidade + DAE) e a consultoria paga o DAE por ele
+  const cobrancaPlus = cliente.plano === "PLUS" ? await prisma.mensalidade.findFirst({ where: { clienteId, status: "ABERTO", valorDae: { gt: 0 } }, orderBy: { vencimento: "asc" } }) : null;
+  if (cobrancaPlus) {
+    const dv = diferencaDias(hoje, cobrancaPlus.vencimento);
+    lista.push({
+      chave: `plus-cobranca:${cobrancaPlus.id}`, para: "EMPREGADOR", link: "/cliente/mensalidade", acao: "Pagar agora", urgente: dv <= 0,
+      titulo: dv < 0 ? "Cobrança do mês em atraso (mensalidade + DAE)" : dv === 0 ? "Hoje vence a cobrança do mês" : `Cobrança do mês vence em ${dv} dia(s)`,
+      texto: `${formatarMoeda(num(cobrancaPlus.valor) + num(cobrancaPlus.valorDae))}, vencimento ${formatarData(cobrancaPlus.vencimento)}. Com o pagamento, a consultoria paga o DAE por você${dv < 0 ? " — sem ele, o DAE fica em atraso e gera multa" : ""}.`,
+    });
+  }
+  const competencias = cliente.plano === "PLUS" ? [] : await prisma.competencia.findMany({ where: { ano: comp.ano, mes: comp.mes, daeEmitido: true, pagamentoConfirmado: false, clienteInformouPagamentoEm: null, empregado: { clienteId } }, include: { empregado: { select: { nome: true } } } });
   for (const c of competencias) {
     if (dias > 5) continue;
     const valor = c.daeValor ? ` de ${formatarMoeda(num(c.daeValor))}` : "";
@@ -137,6 +148,12 @@ export async function rodarLembretesPonto(agora = new Date()) {
     const pendentes = await contarPedidos(c.id);
     for (const l of lembretesPedidosPendentes({ agora, pendentes })) for (const u of c.usuarios) if (await notificar(u.id, { ...l })) enviados++;
   }
+  // Plano Plus: cobrança do mês (mensalidade + DAE) ainda não paga
+  for (const m of await prisma.mensalidade.findMany({ where: { status: "ABERTO", valorDae: { gt: 0 }, cliente: { plano: "PLUS", ativo: true } }, include: { cliente: { select: { usuarios: { where: { papel: "CLIENTE", ativo: true }, select: { id: true } } } } } })) {
+    for (const l of lembretesCobrancaPlus({ agora, vencimento: m.vencimento, total: formatarMoeda(num(m.valor) + num(m.valorDae)) })) {
+      for (const u of m.cliente.usuarios) if (await notificar(u.id, { ...l, chave: `${m.id}:${l.chave}` })) enviados++;
+    }
+  }
   return { empregados: empregados.length, enviados };
 }
 
@@ -146,7 +163,8 @@ export async function rodarLembretesDiarios(hoje = hojeBrasil()) {
   const comp = competenciaAnterior(hoje.getUTCFullYear(), hoje.getUTCMonth() + 1);
   const venc = vencimentoDae(comp.ano, comp.mes);
   const competencias = await prisma.competencia.findMany({
-    where: { ano: comp.ano, mes: comp.mes, daeEmitido: true },
+    // Plano Plus fica de fora: a consultoria paga o DAE (o lembrete é o da cobrança do mês)
+    where: { ano: comp.ano, mes: comp.mes, daeEmitido: true, empregado: { cliente: { plano: { not: "PLUS" } } } },
     include: { empregado: { select: { nome: true, cliente: { include: { usuarios: { where: { papel: "CLIENTE", ativo: true }, select: { id: true } } } } } } },
   });
   for (const c of competencias) {

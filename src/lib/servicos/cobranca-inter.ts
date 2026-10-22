@@ -7,19 +7,32 @@ import { enviarEmail } from "../email";
 import { cancelarCobranca, configInter, consultarCobranca, emitirCobranca } from "../inter/api";
 import { cobrancaAtiva, formaRecebimento, interpretarSituacao, montarPedidoCobranca } from "../inter/regras";
 import { configuracao } from "../tabelas-db";
+import { cobrancaPlusPronta, liberarPagamentosDae } from "./plano-plus";
 
 /** Cobrança automática ligada nas configurações e credenciais do Inter presentes no .env. */
 export async function cobrancaInterAtiva(): Promise<boolean> {
   return (await configuracao()).cobrancaInter && configInter().configurado;
 }
 
+/** A cobrança do Plus ainda espera o consultor emitir os DAEs do mês (não é erro; tenta de novo depois). */
+export class AguardandoDae extends Error {
+  constructor() {
+    super("Plano Plus: aguardando os DAEs do mês para emitir a cobrança única (mensalidade + DAE).");
+  }
+}
+
 /** Emite (ou reaproveita) a cobrança Pix + boleto da mensalidade no Inter. */
 export async function emitirCobrancaMensalidade(id: string, usuarioId?: string | null) {
+  // Plano Plus: a cobrança única só sai quando os DAEs do mês estiverem prontos (o valor inclui o DAE)
+  const base = await prisma.mensalidade.findUniqueOrThrow({ where: { id }, select: { status: true, cliente: { select: { plano: true } } } });
+  if (base.cliente.plano === "PLUS" && base.status === "ABERTO" && !(await cobrancaPlusPronta(id))) throw new AguardandoDae();
   const [m, cfg] = await Promise.all([prisma.mensalidade.findUniqueOrThrow({ where: { id }, include: { cliente: true } }), configuracao()]);
   if (m.status !== "ABERTO") throw new Error("Só é possível emitir cobrança de mensalidade em aberto.");
   if (m.interCodigo && cobrancaAtiva(m.interSituacao)) return m;
+  const comDae = num(m.valorDae) > 0;
   const r = montarPedidoCobranca({
-    mensalidade: { id: m.id, ano: m.ano, mes: m.mes, valor: num(m.valor), vencimento: m.vencimento },
+    descricao: comDae ? `Mensalidade + DAE ${String(m.mes).padStart(2, "0")}/${m.ano} - ${cfg.nomeConsultoria}` : undefined,
+    mensalidade: { id: m.id, ano: m.ano, mes: m.mes, valor: num(m.valor) + num(m.valorDae), vencimento: m.vencimento },
     cliente: m.cliente,
     multaPercentual: num(cfg.multaMensalidade),
     jurosMensalPercentual: num(cfg.jurosMensalidade),
@@ -67,6 +80,7 @@ export async function sincronizarMensalidade(id: string) {
     data: pagaAgora ? { ...dados, status: "PAGO", pagoEm: c.cobranca.dataSituacao ? lerData(c.cobranca.dataSituacao.slice(0, 10)) : hojeBrasil(), formaPagamento: formaRecebimento(c.cobranca.origemRecebimento) } : dados,
   });
   if (pagaAgora) {
+    await liberarPagamentosDae(m.id);
     const valor = c.cobranca.valorTotalRecebido ? Number(c.cobranca.valorTotalRecebido) : num(m.valor);
     await registrarAtividade({ clienteId: m.clienteId, acao: "MENSALIDADE_PAGA", descricao: `Mensalidade ${formatarCompetencia(m.ano, m.mes)} paga — baixa automática pelo Inter (${formaRecebimento(c.cobranca.origemRecebimento)}, ${formatarMoeda(valor)})` });
     const u = m.cliente.usuarios[0];
@@ -96,8 +110,8 @@ export async function rotinaCobrancaInter(hoje = hojeBrasil()) {
     try {
       await emitirCobrancaMensalidade(m.id);
       relatorio.emitidas++;
-    } catch {
-      relatorio.erros++;
+    } catch (e) {
+      if (!(e instanceof AguardandoDae)) relatorio.erros++;
     }
   }
   const pendentes = await prisma.mensalidade.findMany({ where: { status: "ABERTO", interCodigo: { not: null }, interSituacao: { in: ["EM_PROCESSAMENTO", "A_RECEBER", "ATRASADO"] } }, orderBy: { vencimento: "asc" }, take: 100 });

@@ -11,6 +11,7 @@ import { dadosDoForm, dataCampo, dataOpcional, moeda, texto } from "@/lib/formul
 import { configInter, pagarCobrancaSandbox } from "@/lib/inter/api";
 import { ROTULOS_SITUACAO_INTER } from "@/lib/inter/regras";
 import { cancelarCobrancaMensalidade, cobrancaInterAtiva, emitirCobrancaMensalidade, sincronizarMensalidade } from "@/lib/servicos/cobranca-inter";
+import { liberarPagamentosDae, marcarDaePago, pagarDae, reabrirPagamentoDae } from "@/lib/servicos/plano-plus";
 
 /** Gera as mensalidades do mês para todos os clientes ativos (não duplica). */
 export async function gerarMensalidades(_: EstadoAcao, fd: FormData): Promise<EstadoAcao> {
@@ -48,6 +49,8 @@ export async function baixarMensalidade(_: EstadoAcao, fd: FormData): Promise<Es
       return { erro: `Não consegui cancelar a cobrança no Inter (${e instanceof Error ? e.message : "erro"}). Tente de novo antes de dar baixa manual.` };
     }
     const m = await prisma.mensalidade.update({ where: { id: d.id }, data: { status: "PAGO", pagoEm: d.pagoEm ?? hojeBrasil(), formaPagamento: d.forma } });
+    // Plano Plus: com a cobrança paga, o dinheiro do DAE está disponível para pagar o DAE
+    await liberarPagamentosDae(m.id);
     await registrarAtividade({ usuarioId: u.id, clienteId: m.clienteId, acao: "MENSALIDADE_PAGA", descricao: `Mensalidade ${formatarCompetencia(m.ano, m.mes)} paga (${d.forma})` });
     revalidatePath("/consultor/financeiro");
     return { ok: true, mensagem: `Baixa feita.${aviso}` };
@@ -133,6 +136,44 @@ export async function simularPagamentoInter(_: EstadoAcao, fd: FormData): Promis
     const r = await sincronizarMensalidade(m.id);
     revalidatePath("/consultor/financeiro");
     return { ok: true, mensagem: r.pagaAgora ? "Pagamento simulado e baixa automática feita." : "Pagamento simulado; o banco ainda está processando — clique em Atualizar em instantes." };
+  } catch (e) {
+    return erroParaEstado(e);
+  }
+}
+
+/** Plano Plus: pagar (ou tentar de novo) o DAE pelo Inter. */
+export async function pagarDaePlus(_: EstadoAcao, fd: FormData): Promise<EstadoAcao> {
+  await exigirConsultor();
+  try {
+    const p = await pagarDae(String(fd.get("id")));
+    revalidatePath("/consultor/financeiro");
+    return { ok: true, mensagem: p.erro ? p.erro : `Situação: ${p.status.toLowerCase().replace(/_/g, " ")}.` };
+  } catch (e) {
+    return erroParaEstado(e);
+  }
+}
+
+/** Plano Plus: o consultor pagou o DAE por fora do sistema e marca como pago. */
+export async function marcarDaePlusPago(_: EstadoAcao, fd: FormData): Promise<EstadoAcao> {
+  const u = await exigirConsultor();
+  try {
+    const p = await prisma.pagamentoDae.findUniqueOrThrow({ where: { id: String(fd.get("id")) } });
+    if (p.status === "AGUARDANDO_RECURSO") return { erro: "O cliente ainda não pagou a cobrança do mês. A consultoria não paga o DAE com dinheiro próprio." };
+    await marcarDaePago(p.id, u.id);
+    revalidatePath("/consultor/financeiro");
+    return { ok: true, mensagem: "DAE marcado como pago e cliente avisado." };
+  } catch (e) {
+    return erroParaEstado(e);
+  }
+}
+
+/** Plano Plus: nova guia do DAE (valor corrigido) — cancela o agendamento e volta para pagar de novo. */
+export async function reabrirDaePlus(_: EstadoAcao, fd: FormData): Promise<EstadoAcao> {
+  await exigirConsultor();
+  try {
+    await reabrirPagamentoDae(String(fd.get("id")));
+    revalidatePath("/consultor/financeiro");
+    return { ok: true, mensagem: "Reaberto. Atualize o código de barras na rotina e pague de novo." };
   } catch (e) {
     return erroParaEstado(e);
   }

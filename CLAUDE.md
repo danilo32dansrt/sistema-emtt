@@ -70,6 +70,11 @@ Empregada em tempo parcial de 22h semanais, salário R$ 810,50, admitida em 09/0
   (regras puras + testes; cliente HTTP), `src/lib/servicos/cobranca-inter.ts`, webhook `/api/inter/webhook?token=…` (só dispara
   a consulta ao banco; nunca confiar no corpo do aviso) e conferência diária no cron. Credenciais `INTER_*` só no `.env`.
   Cartão de crédito não existe na API do Inter: baixa manual.
+- **2.7.2 Planos (Básico / Médio / Plus):** plano no cadastro do cliente; preços e dia do Plus em Configurações.
+  Plus = cobrança única (mensalidade + DAEs da competência anterior, só emitida com todos os DAEs prontos, vencimento
+  antes do DAE) e a consultoria paga o DAE por conta e ordem do cliente (`PagamentoDae`; API Banking do Inter
+  `/banking/v2/pagamento` com código de barras, ou baixa manual). Nunca pagar DAE sem o dinheiro do cliente.
+  Regras puras em `src/lib/inter/plus.ts`; serviço `src/lib/servicos/plano-plus.ts`.
 - **2.8 Comunicação:** botão de WhatsApp com mensagem pronta e modelos (informações do mês, DAE, mensalidade, férias, 13º).
 
 ## 3. Portal do Cliente

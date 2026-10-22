@@ -124,6 +124,22 @@ e atrasado. Tudo fica também na tela **Avisos** de cada um.
    **iPhone** (iOS 16.4 ou mais novo) — no Safari toque em Compartilhar → **Adicionar à Tela de Início**, abra pelo ícone e
    ative os avisos (a Apple só permite avisos com o app instalado).
 
+## Planos Básico, Médio e Plus
+
+Cada cliente tem um plano (cadastro do cliente). Os preços sugeridos ficam em *Configurações → Planos*.
+No **Plus**, o empregador paga **uma cobrança só por mês (mensalidade + DAE)** e a **consultoria paga o DAE por ele**:
+
+1. Até o dia de emissão, registre o DAE de cada empregado na *Rotina mensal* com o **valor e o código de barras completo**.
+2. Quando todos os DAEs do cliente estiverem prontos, o sistema monta a cobrança do mês (vencimento no dia combinado,
+   padrão dia 5, sempre antes do DAE) e, se a cobrança pelo Inter estiver ligada, emite Pix + boleto.
+3. Quando o cliente paga, o DAE fica "dinheiro recebido": com *Pagar o DAE automaticamente pelo Inter* ligado, o
+   sistema agenda o pagamento para o vencimento (na integração do Inter marque também a permissão **Pagamentos**;
+   se a sua conta exigir, aprove o pagamento no app do Inter — o sistema avisa). Sem isso, pague e clique em
+   *Marcar como pago*. O cliente é avisado e vê "pago pela consultoria".
+4. Se o cliente não pagar, ele recebe lembretes de hora em hora e você é avisado. **O DAE nunca é pago com dinheiro da
+   consultoria.** Combine com o contador o registro desse valor como repasse e inclua no contrato a cláusula de
+   pagamento por conta e ordem do cliente.
+
 ---
 
 ## Antes de vender o sistema

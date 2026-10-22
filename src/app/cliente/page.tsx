@@ -19,6 +19,7 @@ export default async function InicioCliente() {
   const u = await exigirCliente();
   const hoje = hojeBrasil();
   const comp = competenciaPadrao(hoje);
+  const plus = (await prisma.cliente.findUniqueOrThrow({ where: { id: u.clienteId! }, select: { plano: true } })).plano === "PLUS";
   const [empregados, agenda, mensalidade, assinar, { tabela }] = await Promise.all([
     prisma.empregado.findMany({ where: { clienteId: u.clienteId, situacao: { not: "DESLIGADO" } }, include: { competencias: { where: { ano: comp.ano, mes: comp.mes } }, lancamentos: { where: { ano: comp.ano, mes: comp.mes } } } }),
     agendaDoBanco({ clienteId: u.clienteId, de: hoje, ate: addDias(hoje, 60), hoje }),
@@ -54,7 +55,7 @@ export default async function InicioCliente() {
                 <ul className="grid gap-2 sm:grid-cols-2">
                   {etapas.map((x) => <li key={x.rotulo} className="flex items-center gap-2 text-sm"><span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${x.ok ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"}`}>{x.ok ? "✓" : "…"}</span>{x.rotulo}</li>)}
                 </ul>
-                {c?.daeEmitido && !c.pagamentoConfirmado && !c.clienteInformouPagamentoEm && <div className="mt-3"><LinkBotao pequeno variante="sucesso" href="/cliente/dae">Já paguei o DAE</LinkBotao></div>}
+                {!plus && c?.daeEmitido && !c.pagamentoConfirmado && !c.clienteInformouPagamentoEm && <div className="mt-3"><LinkBotao pequeno variante="sucesso" href="/cliente/dae">Já paguei o DAE</LinkBotao></div>}
               </Cartao>
             );
           })}

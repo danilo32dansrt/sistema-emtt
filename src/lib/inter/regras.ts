@@ -61,6 +61,8 @@ export interface DadosPedido {
   diasBaixa: number;
   nomeConsultoria: string;
   hoje: Date;
+  /** Texto da 1ª linha do boleto (padrão: "Mensalidade MM/AAAA - consultoria"). */
+  descricao?: string;
 }
 
 export interface PedidoCobranca {
@@ -111,7 +113,7 @@ export function montarPedidoCobranca(d: DadosPedido): { ok: true; pedido: Pedido
     numDiasAgenda: Math.min(60, Math.max(0, Math.trunc(d.diasBaixa))),
     formasRecebimento: ["BOLETO", "PIX"],
     pagador,
-    mensagem: { linha1: corta(`Mensalidade ${comp} - ${d.nomeConsultoria}`, 78), linha2: "Pague pelo Pix (QR Code) ou pelo codigo de barras." },
+    mensagem: { linha1: corta(d.descricao ?? `Mensalidade ${comp} - ${d.nomeConsultoria}`, 78), linha2: "Pague pelo Pix (QR Code) ou pelo codigo de barras." },
   };
   if (d.multaPercentual > 0) pedido.multa = { codigo: "PERCENTUAL", taxa: Math.round(d.multaPercentual * 100) / 100 };
   if (d.jurosMensalPercentual > 0) pedido.mora = { codigo: "TAXAMENSAL", taxa: Math.round(d.jurosMensalPercentual * 100) / 100 };

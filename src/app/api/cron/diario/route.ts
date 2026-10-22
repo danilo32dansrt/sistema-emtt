@@ -5,6 +5,7 @@ import { enviarEmail } from "@/lib/email";
 import { agendaDoBanco } from "@/lib/servicos/agenda";
 import { rotinaCobrancaInter } from "@/lib/servicos/cobranca-inter";
 import { rodarLembretesDiarios } from "@/lib/servicos/lembretes";
+import { rotinaPlus } from "@/lib/servicos/plano-plus";
 import { situacaoParametros, verificarFontesOficiais } from "@/lib/servicos/parametros";
 
 /**
@@ -13,6 +14,7 @@ import { situacaoParametros, verificarFontesOficiais } from "@/lib/servicos/para
  * - gera as mensalidades do mês no dia 1º;
  * - envia por e-mail os lembretes dos próximos 7 dias ao consultor e a cada cliente;
  * - emite pelo Banco Inter as cobranças das mensalidades e confere as pendentes (baixa automática);
+ * - plano Plus: confere no Inter os DAEs pagos pela consultoria e avisa quando o cliente não pagou;
  * - avisa no celular do patrão o DAE a pagar e os pedidos de ponto esperando resposta;
  * - lembra o cliente da mensalidade que vai vencer;
  * - verifica as páginas oficiais dos parâmetros e avisa o consultor quando há algo a conferir.
@@ -51,6 +53,14 @@ export async function GET(req: NextRequest) {
     relatorio.errosInter = -1;
   }
 
+  try {
+    const plus = await rotinaPlus(hoje);
+    relatorio.daesPlusConferidos = plus.conferidos;
+    relatorio.daesPlusPagos = plus.pagos;
+    relatorio.daesPlusSemRecurso = plus.semRecurso;
+  } catch (e) {
+    console.error("Rotina do plano Plus falhou", e);
+  }
   try {
     relatorio.avisosCelular = (await rodarLembretesDiarios(hoje)).enviados;
   } catch (e) {

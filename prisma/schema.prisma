@@ -170,6 +170,9 @@ model Configuracao {
   diaVencimentoPlus    Int      @default(5)
   /// Plano Plus: pagar o DAE automaticamente pela API do Inter (senão, o consultor paga e marca como pago)
   pagamentoDaeInter    Boolean  @default(false)
+  /// Chaves das notificações no celular, geradas sozinhas no primeiro uso quando não estão no .env
+  vapidPublica         String?
+  vapidPrivada         String?
 }
 
 /// Tabela única de parâmetros legais com data de vigência (histórico: uma linha por vigência).

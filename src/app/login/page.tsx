@@ -1,10 +1,15 @@
+import { redirect } from "next/navigation";
 import { Formulario } from "@/components/Formulario";
 import { Campo } from "@/components/ui";
+import { prisma } from "@/lib/db";
 import { entrar } from "./acoes";
 
 export const metadata = { title: "Entrar" };
+export const dynamic = "force-dynamic";
 
 export default async function PaginaLogin({ searchParams }: { searchParams: Promise<{ voltar?: string }> }) {
+  // Sistema recém-publicado, sem nenhum consultor: vai para o primeiro acesso
+  if (!(await prisma.usuario.count({ where: { papel: "CONSULTOR" } }))) redirect("/primeiro-acesso");
   const { voltar } = await searchParams;
   return (
     <main className="flex min-h-screen items-center justify-center p-4">

@@ -3,24 +3,45 @@ import webpush from "web-push";
 import { prisma } from "./db";
 
 /**
- * Avisos para patrão e empregada: ficam na central de avisos do app e, se o celular aceitou,
- * chegam como notificação (Web Push). Chaves VAPID só no .env (gere com: npx web-push generate-vapid-keys).
+ * Avisos para consultor, patrão e empregada: ficam na central de avisos do app e, se o celular aceitou,
+ * chegam como notificação (Web Push). As chaves (VAPID) vêm do .env; se não estiverem lá, o sistema gera
+ * um par no primeiro uso e guarda no banco (protegido), para funcionar sem precisar rodar comandos.
  */
 
-export function chavePublicaPush(): string | null {
-  return process.env.VAPID_PUBLIC_KEY?.trim() || null;
-}
+let chaves: { publica: string; privada: string } | null = null;
 
-let configurado = false;
-function pushDisponivel(): boolean {
+async function chavesPush(): Promise<{ publica: string; privada: string }> {
+  if (chaves) return chaves;
   const pub = process.env.VAPID_PUBLIC_KEY?.trim();
   const priv = process.env.VAPID_PRIVATE_KEY?.trim();
-  if (!pub || !priv) return false;
-  if (!configurado) {
-    webpush.setVapidDetails(process.env.VAPID_ASSUNTO?.trim() || "mailto:contato@example.com", pub, priv);
-    configurado = true;
+  if (pub && priv) chaves = { publica: pub, privada: priv };
+  else {
+    const cfg = await prisma.configuracao.upsert({ where: { id: "principal" }, create: { id: "principal" }, update: {} });
+    if (cfg.vapidPublica && cfg.vapidPrivada) chaves = { publica: cfg.vapidPublica, privada: cfg.vapidPrivada };
+    else {
+      const novas = webpush.generateVAPIDKeys();
+      // Só grava se ninguém gravou antes (duas requisições ao mesmo tempo)
+      await prisma.configuracao.updateMany({ where: { id: "principal", vapidPublica: null }, data: { vapidPublica: novas.publicKey, vapidPrivada: novas.privateKey } });
+      const final = await prisma.configuracao.findUniqueOrThrow({ where: { id: "principal" } });
+      chaves = { publica: final.vapidPublica!, privada: final.vapidPrivada! };
+    }
   }
-  return true;
+  webpush.setVapidDetails(process.env.VAPID_ASSUNTO?.trim() || "mailto:contato@example.com", chaves.publica, chaves.privada);
+  return chaves;
+}
+
+/** Chave pública para o celular se inscrever (o botão "Ativar avisos no celular"). */
+export async function chavePublicaPush(): Promise<string | null> {
+  try {
+    return (await chavesPush()).publica;
+  } catch (e) {
+    console.error("Chaves de notificação indisponíveis", e);
+    return null;
+  }
+}
+
+async function pushDisponivel(): Promise<boolean> {
+  return (await chavePublicaPush()) !== null;
 }
 
 export interface Aviso {
@@ -40,7 +61,7 @@ export async function notificar(usuarioId: string, a: Aviso): Promise<boolean> {
     if (e instanceof Error && e.message.includes("Unique constraint")) return false;
     throw e;
   }
-  if (!pushDisponivel()) return true;
+  if (!(await pushDisponivel())) return true;
   const inscricoes = await prisma.inscricaoPush.findMany({ where: { usuarioId } });
   // A tag agrupa repetições do mesmo lembrete: a notificação nova substitui a anterior no celular
   const corpo = JSON.stringify({ titulo: a.titulo, texto: a.texto, link: a.link ?? "/", tag: a.chave.split(":").slice(0, 3).join(":"), acao: a.acao });

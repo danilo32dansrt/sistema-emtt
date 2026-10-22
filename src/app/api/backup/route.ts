@@ -8,7 +8,7 @@ export async function GET() {
   const u = await usuarioAtual();
   if (!u || u.papel !== "CONSULTOR") return new NextResponse("Não autorizado", { status: 401 });
   const [configuracao, parametros, precos, modelos, clientes, empregados, historico, ferias, afastamentos, competencias, lancamentos, marcacoes, ajustes, justificativas, espelhos, documentos, assinaturas, mensalidades, servicos, leads, ocorrencias, artigos, arquivos, usuarios] = await Promise.all([
-    prisma.configuracao.findMany(), prisma.parametro.findMany(), prisma.tabelaPreco.findMany(), prisma.modeloMensagem.findMany(),
+    prisma.configuracao.findMany({ omit: { vapidPrivada: true } }), prisma.parametro.findMany(), prisma.tabelaPreco.findMany(), prisma.modeloMensagem.findMany(),
     prisma.cliente.findMany(), prisma.empregado.findMany(), prisma.historicoEmpregado.findMany(), prisma.ferias.findMany(), prisma.afastamento.findMany(),
     prisma.competencia.findMany(), prisma.lancamentoMensal.findMany(), prisma.marcacaoPonto.findMany(), prisma.ajustePonto.findMany(), prisma.justificativa.findMany(),
     prisma.espelhoPonto.findMany(), prisma.documento.findMany(), prisma.assinatura.findMany(), prisma.mensalidade.findMany(), prisma.servicoAvulso.findMany(),

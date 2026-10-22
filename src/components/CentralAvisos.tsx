@@ -14,7 +14,7 @@ export async function CentralAvisos({ usuarioId }: { usuarioId: string }) {
   return (
     <>
       <Titulo subtitulo="Lembretes do ponto, do DAE e dos pedidos de ajuste." acoes={naoLidos ? <BotaoAcao acao={marcarAvisosLidos}>Marcar todos como lidos</BotaoAcao> : undefined}>Avisos</Titulo>
-      <div className="mb-4"><AtivarAvisos chavePublica={chavePublicaPush()} /></div>
+      <div className="mb-4"><AtivarAvisos chavePublica={await chavePublicaPush()} /></div>
       {avisos.length ? (
         <ul className="space-y-2">
           {avisos.map((a) => {

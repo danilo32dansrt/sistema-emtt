@@ -94,7 +94,7 @@ export default async function Painel() {
   return (
     <>
       <Titulo subtitulo={`Hoje é ${formatarData(hoje)}. Competência em foco: ${formatarCompetencia(comp.ano, comp.mes)}.`}>Painel geral</Titulo>
-      <div className="mb-4 max-w-xl"><AtivarAvisos chavePublica={chavePublicaPush()} compacto /></div>
+      <div className="mb-4 max-w-xl"><AtivarAvisos chavePublica={await chavePublicaPush()} compacto /></div>
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Indicador rotulo="Clientes ativos" valor={clientes.length} href="/consultor/clientes" detalhe={`${empregados.length} empregado(s)`} />
         <Indicador rotulo="Rotina atrasada" valor={atrasadosChecklist} cor={atrasadosChecklist ? "vermelho" : "verde"} href="/consultor/rotina" detalhe={`${pendentesChecklist} em andamento`} />

@@ -47,7 +47,7 @@ export default async function PaginaPonto() {
         exigirLocalizacao={emp.exigirLocalizacao}
         marcacoesHoje={marcacoes.map((m) => ({ tipo: m.tipo, dataHora: m.dataHora.toISOString() }))}
       />
-      <div className="mt-4"><AtivarAvisos chavePublica={chavePublicaPush()} compacto /></div>
+      <div className="mt-4"><AtivarAvisos chavePublica={await chavePublicaPush()} compacto /></div>
     </>
   );
 }

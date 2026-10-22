@@ -19,7 +19,7 @@ export default async function AvisosConsultor() {
           <p className="mb-3 text-sm text-slate-600">
             Manda um exemplo de <b>cada tipo de aviso</b> (entrada não lançada, intervalo, saída, dia sem marcação, pedidos, fechar o mês, DAE, cobrança do Plus,
             guias…) para os celulares que já ativaram os avisos. Bloqueie a tela dos celulares antes de enviar para ver como chegam.
-            {!chavePublicaPush() && <b className="text-red-700"> As chaves de notificação (VAPID) ainda não estão no .env: os avisos ficam só dentro do app.</b>}
+            {!(await chavePublicaPush()) && <b className="text-red-700"> As chaves de notificação (VAPID) ainda não estão no .env: os avisos ficam só dentro do app.</b>}
           </p>
           <Formulario acao={testarAvisos} textoBotao="Enviar avisos de teste agora">
             <Selecao rotulo="Cliente de teste (o patrão e a empregada dele recebem)" name="clienteId" opcoes={clientes.map((c) => ({ valor: c.id, rotulo: c.nome }))} />

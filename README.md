@@ -77,7 +77,10 @@ São 95 testes. O principal confere o caso real de fevereiro/2026: proporcional 
 3. **Vercel**: *Add New Project* → escolha o repositório → em *Environment Variables* cadastre tudo o que está no `.env.example` (com valores reais):
    `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` (gere com `openssl rand -base64 48`), `CRON_SECRET`, `APP_URL` e, se quiser e-mails, `RESEND_API_KEY` e `EMAIL_REMETENTE`.
 4. Mude o comando de build na Vercel para `prisma migrate deploy && npm run build` (cria/atualiza as tabelas a cada publicação).
-5. Depois do primeiro deploy, rode uma vez no seu computador, apontando o `.env` para o Supabase:
+5. **Primeiro acesso (sem comandos):** abra o endereço do sistema — com o banco vazio ele leva à tela *Primeiro acesso*,
+   onde você cria a sua conta de consultor. Depois cadastre clientes e empregadas e crie o acesso de cada um pelo sistema.
+   Faça isso logo após publicar (a tela só funciona enquanto não houver nenhum consultor).
+   Opcional, para carregar dados de exemplo: rode uma vez no seu computador, apontando o `.env` para o Supabase:
    `npm run db:seed` — ou `npx tsx prisma/seed.ts --somente-tabelas` para carregar só as tabelas anuais, sem dados de exemplo.
 6. A rotina diária (`/api/cron/diario`) já está agendada no `vercel.json` (07h de Brasília). A Vercel envia o `CRON_SECRET` automaticamente.
 
@@ -115,8 +118,9 @@ O sistema avisa: hora de bater o ponto, de sair e voltar do intervalo, de marcar
 (para os dois); pedidos de ajuste e justificativas (para o patrão) e a resposta (para a empregada); DAE a vencer, vencendo
 e atrasado. Tudo fica também na tela **Avisos** de cada um.
 
-1. Gere as chaves: `npx web-push generate-vapid-keys` e coloque `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_ASSUNTO`
-   no `.env` e na Vercel.
+1. Chaves das notificações: **não precisa fazer nada** — o sistema gera sozinho no primeiro uso e guarda no banco.
+   (Opcional: para usar as suas, gere com `npx web-push generate-vapid-keys` e coloque `VAPID_PUBLIC_KEY`,
+   `VAPID_PRIVATE_KEY` e `VAPID_ASSUNTO` no `.env` e na Vercel.)
 2. Os lembretes do ponto precisam rodar **a cada 10 minutos**. No plano gratuito da Vercel o agendamento só roda 1 vez por
    dia; use um agendador gratuito como o **cron-job.org**: crie uma tarefa a cada 10 minutos chamando
    `https://SEU-ENDERECO/api/cron/lembretes` com o cabeçalho `Authorization: Bearer <CRON_SECRET>`.
